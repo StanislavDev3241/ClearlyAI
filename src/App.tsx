@@ -135,7 +135,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
     }
   };
 
-  const copyToClipboard = (text: string, type: string) => {
+  const copyToClipboard = (text: string, _type: string) => {
     navigator.clipboard.writeText(text);
     // You could add a toast notification here
   };
