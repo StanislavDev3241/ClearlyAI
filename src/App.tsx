@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Upload,
   FileText,
@@ -20,6 +20,15 @@ function App() {
   const [output, setOutput] = useState<OutputData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Monitor output state changes
+  useEffect(() => {
+    if (output) {
+      console.log("Output state updated:", output);
+      console.log("SOAP Note length:", output.soapNote?.length);
+      console.log("Patient Summary length:", output.patientSummary?.length);
+    }
+  }, [output]);
 
   const handleFileSelect = (selectedFile: File) => {
     if (
@@ -79,23 +88,37 @@ function App() {
       // Debug logging
       console.log("Webhook Response:", result);
       console.log("Response keys:", Object.keys(result));
+      console.log("Response type:", typeof result);
+      console.log("soap_note_text exists:", !!result.soap_note_text);
+      console.log(
+        "patient_summary_text exists:",
+        !!result.patient_summary_text
+      );
+      console.log("soapNote exists:", !!result.soapNote);
+      console.log("patientSummary exists:", !!result.patientSummary);
 
       // Handle the response from Make.com
       if (result.soap_note_text && result.patient_summary_text) {
         console.log("Using new format");
-        setOutput({
+        console.log("SOAP Note content:", result.soap_note_text);
+        console.log("Patient Summary content:", result.patient_summary_text);
+        const outputData = {
           soapNote: result.soap_note_text,
           patientSummary: result.patient_summary_text,
-        });
+        };
+        console.log("Setting output data:", outputData);
+        setOutput(outputData);
       } else if (result.soapNote && result.patientSummary) {
         console.log("Using old format");
-        // Fallback for old format
-        setOutput({
+        const outputData = {
           soapNote: result.soapNote,
           patientSummary: result.patientSummary,
-        });
+        };
+        console.log("Setting output data (old format):", outputData);
+        setOutput(outputData);
       } else {
         console.log("Using fallback mock response");
+        console.log("Available keys in response:", Object.keys(result));
         // Fallback to mock response if the webhook doesn't return expected format
         const mockResponse: OutputData = {
           soapNote: `SOAP Note - ${file.name}
