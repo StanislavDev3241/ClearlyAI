@@ -56,7 +56,7 @@ The application is now integrated with your Make.com webhook at:
 The webhook expects:
 
 - File upload via FormData
-- Returns JSON with `soapNote` and `patientSummary` fields
+- Returns JSON with `soap_note_text` and `patient_summary_text` fields
 
 Ensure your Make.com scenario handles:
 

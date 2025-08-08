@@ -74,10 +74,16 @@ function App() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
-
+            const result = await response.json();
+      
       // Handle the response from Make.com
-      if (result.soapNote && result.patientSummary) {
+      if (result.soap_note_text && result.patient_summary_text) {
+        setOutput({
+          soapNote: result.soap_note_text,
+          patientSummary: result.patient_summary_text,
+        });
+      } else if (result.soapNote && result.patientSummary) {
+        // Fallback for old format
         setOutput({
           soapNote: result.soapNote,
           patientSummary: result.patientSummary,
