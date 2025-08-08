@@ -204,7 +204,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       <section className="bg-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-clearly-blue mb-6">
-            Generate SOAP notes & patient scripts with AI
+            Generate SOAP notes & patient-ready appointment summaries with AI
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             Upload your audio recording or transcription and receive
