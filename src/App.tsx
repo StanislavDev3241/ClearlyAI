@@ -21,24 +21,21 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Monitor output state changes
-  useEffect(() => {
-    if (output) {
-      console.log("Output state updated:", output);
-      console.log("SOAP Note length:", output.soapNote?.length);
-      console.log("Patient Summary length:", output.patientSummary?.length);
-    }
-  }, [output]);
+
 
   const handleFileSelect = (selectedFile: File) => {
-    if (
-      selectedFile.type === "text/plain" ||
-      selectedFile.name.endsWith(".txt")
-    ) {
+    // Check for text files or audio files
+    const isTextFile = selectedFile.type === "text/plain" || selectedFile.name.endsWith(".txt");
+    const isAudioFile = selectedFile.type.startsWith("audio/") || 
+                       selectedFile.name.endsWith(".mp3") || 
+                       selectedFile.name.endsWith(".m4a") ||
+                       selectedFile.name.endsWith(".wav");
+    
+    if (isTextFile || isAudioFile) {
       setFile(selectedFile);
       setError(null);
     } else {
-      setError("Please select a .txt file");
+      setError("Please select a .txt file or audio file (.mp3, .m4a, .wav)");
       setFile(null);
     }
   };
@@ -85,40 +82,19 @@ function App() {
 
       const result = await response.json();
 
-      // Debug logging
-      console.log("Webhook Response:", result);
-      console.log("Response keys:", Object.keys(result));
-      console.log("Response type:", typeof result);
-      console.log("soap_note_text exists:", !!result.soap_note_text);
-      console.log(
-        "patient_summary_text exists:",
-        !!result.patient_summary_text
-      );
-      console.log("soapNote exists:", !!result.soapNote);
-      console.log("patientSummary exists:", !!result.patientSummary);
-
       // Handle the response from Make.com
       if (result.soap_note_text && result.patient_summary_text) {
-        console.log("Using new format");
-        console.log("SOAP Note content:", result.soap_note_text);
-        console.log("Patient Summary content:", result.patient_summary_text);
-        const outputData = {
+        setOutput({
           soapNote: result.soap_note_text,
           patientSummary: result.patient_summary_text,
-        };
-        console.log("Setting output data:", outputData);
-        setOutput(outputData);
+        });
       } else if (result.soapNote && result.patientSummary) {
-        console.log("Using old format");
-        const outputData = {
+        // Fallback for old format
+        setOutput({
           soapNote: result.soapNote,
           patientSummary: result.patientSummary,
-        };
-        console.log("Setting output data (old format):", outputData);
-        setOutput(outputData);
+        });
       } else {
-        console.log("Using fallback mock response");
-        console.log("Available keys in response:", Object.keys(result));
         // Fallback to mock response if the webhook doesn't return expected format
         const mockResponse: OutputData = {
           soapNote: `SOAP Note - ${file.name}
@@ -165,10 +141,6 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       }
     } catch (err) {
       console.error("Error uploading file:", err);
-      console.error("Error details:", {
-        message: err instanceof Error ? err.message : "Unknown error",
-        stack: err instanceof Error ? err.stack : undefined,
-      });
       setError("Failed to process file. Please try again.");
     } finally {
       setIsUploading(false);
