@@ -198,7 +198,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             Generate SOAP notes & patient scripts with AI
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Upload your transcription and receive easy-to-read notes in seconds.
+            Upload your audio recording or transcription and receive easy-to-read notes in seconds.
           </p>
 
           {/* Upload Section */}
@@ -211,10 +211,13 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             >
               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-lg font-medium text-gray-700 mb-2">
-                Upload transcript (.txt or .mp3)
+                Upload transcript or audio recording
               </p>
               <p className="text-sm text-gray-500">
                 Drag and drop your file here, or click to browse
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Supported: .txt, .mp3, .m4a, .wav
               </p>
               {file && (
                 <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -228,7 +231,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.mp3"
+              accept=".txt,.mp3,.m4a,.wav,audio/*"
               onChange={(e) => {
                 const selectedFile = e.target.files?.[0];
                 if (selectedFile) {
@@ -365,7 +368,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 Upload
               </h3>
               <p className="text-gray-600">
-                Upload audio or text transcript at the end of the patient visit.
+                Upload audio recording or text transcript at the end of the patient visit.
               </p>
             </div>
 
