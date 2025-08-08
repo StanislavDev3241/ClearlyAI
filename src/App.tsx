@@ -74,21 +74,28 @@ function App() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-            const result = await response.json();
+      const result = await response.json();
       
+      // Debug logging
+      console.log('Webhook Response:', result);
+      console.log('Response keys:', Object.keys(result));
+
       // Handle the response from Make.com
       if (result.soap_note_text && result.patient_summary_text) {
+        console.log('Using new format');
         setOutput({
           soapNote: result.soap_note_text,
           patientSummary: result.patient_summary_text,
         });
       } else if (result.soapNote && result.patientSummary) {
+        console.log('Using old format');
         // Fallback for old format
         setOutput({
           soapNote: result.soapNote,
           patientSummary: result.patientSummary,
         });
       } else {
+        console.log('Using fallback mock response');
         // Fallback to mock response if the webhook doesn't return expected format
         const mockResponse: OutputData = {
           soapNote: `SOAP Note - ${file.name}
@@ -135,6 +142,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       }
     } catch (err) {
       console.error("Error uploading file:", err);
+      console.error("Error details:", {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
       setError("Failed to process file. Please try again.");
     } finally {
       setIsUploading(false);
