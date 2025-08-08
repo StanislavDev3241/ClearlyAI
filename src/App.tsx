@@ -14,11 +14,20 @@ interface OutputData {
   patientSummary: string;
 }
 
+interface OutputSelection {
+  soapNote: boolean;
+  patientSummary: boolean;
+}
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [output, setOutput] = useState<OutputData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [outputSelection, setOutputSelection] = useState<OutputSelection>({
+    soapNote: true,
+    patientSummary: true,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (selectedFile: File) => {
@@ -198,7 +207,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             Generate SOAP notes & patient scripts with AI
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Upload your audio recording or transcription and receive easy-to-read notes in seconds.
+            Upload your audio recording or transcription and receive
+            easy-to-read notes in seconds.
           </p>
 
           {/* Upload Section */}
@@ -243,9 +253,44 @@ Your oral health is excellent! Keep up the great work with your daily dental car
 
             {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
 
+            {/* Output Selection */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-3">Select output types:</p>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={outputSelection.soapNote}
+                    onChange={(e) =>
+                      setOutputSelection(prev => ({
+                        ...prev,
+                        soapNote: e.target.checked
+                      }))
+                    }
+                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue"
+                  />
+                  <span className="text-sm text-gray-700">SOAP Note</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={outputSelection.patientSummary}
+                    onChange={(e) =>
+                      setOutputSelection(prev => ({
+                        ...prev,
+                        patientSummary: e.target.checked
+                      }))
+                    }
+                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue"
+                  />
+                  <span className="text-sm text-gray-700">Patient Summary</span>
+                </label>
+              </div>
+            </div>
+
             <button
               onClick={handleUpload}
-              disabled={!file || isUploading}
+              disabled={!file || isUploading || (!outputSelection.soapNote && !outputSelection.patientSummary)}
               className="btn-primary mt-6 w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUploading ? "Generating Notes..." : "Generate Notes"}
@@ -258,77 +303,81 @@ Your oral health is excellent! Keep up the great work with your daily dental car
               <h2 className="text-3xl font-bold text-clearly-blue text-center mb-8">
                 Your Generated Notes
               </h2>
-              <div className="grid md:grid-cols-2 gap-8">
+              <div className={`grid gap-8 ${outputSelection.soapNote && outputSelection.patientSummary ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
                 {/* SOAP Note */}
-                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      SOAP Note
-                    </h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          copyToClipboard(output.soapNote, "SOAP Note")
-                        }
-                        className="btn-secondary text-sm py-2 px-3"
-                      >
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copy
-                      </button>
-                      <button
-                        onClick={() =>
-                          downloadFile(output.soapNote, "SOAP-Note")
-                        }
-                        className="btn-secondary text-sm py-2 px-3"
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </button>
+                {outputSelection.soapNote && (
+                  <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        SOAP Note
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(output.soapNote, "SOAP Note")
+                          }
+                          className="btn-secondary text-sm py-2 px-3"
+                        >
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
+                        </button>
+                        <button
+                          onClick={() =>
+                            downloadFile(output.soapNote, "SOAP-Note")
+                          }
+                          className="btn-secondary text-sm py-2 px-3"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                      <pre className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {output.soapNote}
+                      </pre>
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                    <pre className="text-sm text-gray-800 whitespace-pre-wrap">
-                      {output.soapNote}
-                    </pre>
-                  </div>
-                </div>
+                )}
 
                 {/* Patient Summary */}
-                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      Patient Summary
-                    </h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          copyToClipboard(
-                            output.patientSummary,
-                            "Patient Summary"
-                          )
-                        }
-                        className="btn-secondary text-sm py-2 px-3"
-                      >
-                        <Copy className="h-4 w-4 mr-1" />
-                        Copy
-                      </button>
-                      <button
-                        onClick={() =>
-                          downloadFile(output.patientSummary, "Patient-Summary")
-                        }
-                        className="btn-secondary text-sm py-2 px-3"
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
-                      </button>
+                {outputSelection.patientSummary && (
+                  <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Patient Summary
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              output.patientSummary,
+                              "Patient Summary"
+                            )
+                          }
+                          className="btn-secondary text-sm py-2 px-3"
+                        >
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
+                        </button>
+                        <button
+                          onClick={() =>
+                            downloadFile(output.patientSummary, "Patient-Summary")
+                          }
+                          className="btn-secondary text-sm py-2 px-3"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                      <pre className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {output.patientSummary}
+                      </pre>
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                    <pre className="text-sm text-gray-800 whitespace-pre-wrap">
-                      {output.patientSummary}
-                    </pre>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Reset Form Button */}
@@ -338,6 +387,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     setFile(null);
                     setOutput(null);
                     setError(null);
+                    setOutputSelection({
+                      soapNote: true,
+                      patientSummary: true,
+                    });
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
                     }
@@ -368,7 +421,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 Upload
               </h3>
               <p className="text-gray-600">
-                Upload audio recording or text transcript at the end of the patient visit.
+                Upload audio recording or text transcript at the end of the
+                patient visit.
               </p>
             </div>
 
