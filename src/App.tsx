@@ -269,16 +269,16 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         soapNote: e.target.checked,
                       }))
                     }
-                    disabled={!!output}
+                    disabled={!!output || isUploading}
                     className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span
-                    className={`text-sm ${
-                      output ? "text-gray-500" : "text-gray-700"
-                    }`}
-                  >
-                    SOAP Note
-                  </span>
+                                     <span
+                     className={`text-sm ${
+                       output || isUploading ? "text-gray-500" : "text-gray-700"
+                     }`}
+                   >
+                     SOAP Note
+                   </span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -290,16 +290,16 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         patientSummary: e.target.checked,
                       }))
                     }
-                    disabled={!!output}
+                    disabled={!!output || isUploading}
                     className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span
-                    className={`text-sm ${
-                      output ? "text-gray-500" : "text-gray-700"
-                    }`}
-                  >
-                    Patient Summary
-                  </span>
+                                     <span
+                     className={`text-sm ${
+                       output || isUploading ? "text-gray-500" : "text-gray-700"
+                     }`}
+                   >
+                     Patient Summary
+                   </span>
                 </label>
               </div>
               {output && (
