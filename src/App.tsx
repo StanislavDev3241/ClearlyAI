@@ -255,42 +255,67 @@ Your oral health is excellent! Keep up the great work with your daily dental car
 
             {/* Output Selection */}
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-3">Select output types:</p>
-              <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700 mb-3">
+                Select output types:
+              </p>
+              <div className="flex space-x-6">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
                     checked={outputSelection.soapNote}
                     onChange={(e) =>
-                      setOutputSelection(prev => ({
+                      setOutputSelection((prev) => ({
                         ...prev,
-                        soapNote: e.target.checked
+                        soapNote: e.target.checked,
                       }))
                     }
-                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue"
+                    disabled={!!output}
+                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span className="text-sm text-gray-700">SOAP Note</span>
+                  <span
+                    className={`text-sm ${
+                      output ? "text-gray-500" : "text-gray-700"
+                    }`}
+                  >
+                    SOAP Note
+                  </span>
                 </label>
                 <label className="flex items-center">
                   <input
                     type="checkbox"
                     checked={outputSelection.patientSummary}
                     onChange={(e) =>
-                      setOutputSelection(prev => ({
+                      setOutputSelection((prev) => ({
                         ...prev,
-                        patientSummary: e.target.checked
+                        patientSummary: e.target.checked,
                       }))
                     }
-                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue"
+                    disabled={!!output}
+                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <span className="text-sm text-gray-700">Patient Summary</span>
+                  <span
+                    className={`text-sm ${
+                      output ? "text-gray-500" : "text-gray-700"
+                    }`}
+                  >
+                    Patient Summary
+                  </span>
                 </label>
               </div>
+              {output && (
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 Click "Generate Another Note" to change these selections
+                </p>
+              )}
             </div>
 
             <button
               onClick={handleUpload}
-              disabled={!file || isUploading || (!outputSelection.soapNote && !outputSelection.patientSummary)}
+              disabled={
+                !file ||
+                isUploading ||
+                (!outputSelection.soapNote && !outputSelection.patientSummary)
+              }
               className="btn-primary mt-6 w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUploading ? "Generating Notes..." : "Generate Notes"}
@@ -303,7 +328,13 @@ Your oral health is excellent! Keep up the great work with your daily dental car
               <h2 className="text-3xl font-bold text-clearly-blue text-center mb-8">
                 Your Generated Notes
               </h2>
-              <div className={`grid gap-8 ${outputSelection.soapNote && outputSelection.patientSummary ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
+              <div
+                className={`grid gap-8 ${
+                  outputSelection.soapNote && outputSelection.patientSummary
+                    ? "md:grid-cols-2"
+                    : "md:grid-cols-1"
+                }`}
+              >
                 {/* SOAP Note */}
                 {outputSelection.soapNote && (
                   <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
@@ -362,7 +393,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         </button>
                         <button
                           onClick={() =>
-                            downloadFile(output.patientSummary, "Patient-Summary")
+                            downloadFile(
+                              output.patientSummary,
+                              "Patient-Summary"
+                            )
                           }
                           className="btn-secondary text-sm py-2 px-3"
                         >
