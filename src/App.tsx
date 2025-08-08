@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   Upload,
   FileText,
@@ -21,16 +21,16 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-
-
   const handleFileSelect = (selectedFile: File) => {
     // Check for text files or audio files
-    const isTextFile = selectedFile.type === "text/plain" || selectedFile.name.endsWith(".txt");
-    const isAudioFile = selectedFile.type.startsWith("audio/") || 
-                       selectedFile.name.endsWith(".mp3") || 
-                       selectedFile.name.endsWith(".m4a") ||
-                       selectedFile.name.endsWith(".wav");
-    
+    const isTextFile =
+      selectedFile.type === "text/plain" || selectedFile.name.endsWith(".txt");
+    const isAudioFile =
+      selectedFile.type.startsWith("audio/") ||
+      selectedFile.name.endsWith(".mp3") ||
+      selectedFile.name.endsWith(".m4a") ||
+      selectedFile.name.endsWith(".wav");
+
     if (isTextFile || isAudioFile) {
       setFile(selectedFile);
       setError(null);
