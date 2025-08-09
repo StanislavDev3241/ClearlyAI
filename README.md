@@ -1,10 +1,10 @@
-# ClearlyAI MVP
+# EZNotes.pro MVP
 
 A single-page web application that allows healthcare professionals to upload patient visit transcripts and receive AI-generated SOAP notes and patient summaries.
 
 ## 🎯 Overview
 
-ClearlyAI is designed to streamline clinical documentation by:
+EZNotes.pro is designed to streamline clinical documentation by:
 
 - Accepting .txt file uploads (transcripts of patient visits)
 - Generating professional SOAP notes using AI

@@ -64,25 +64,25 @@ function App() {
     audioContextRef.current = audioContext;
     analyserRef.current = analyser;
 
-          const updateAudioLevel = () => {
-        if (!analyser) return;
+    const updateAudioLevel = () => {
+      if (!analyser) return;
 
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteTimeDomainData(dataArray); // Use time domain for better voice detection
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteTimeDomainData(dataArray); // Use time domain for better voice detection
 
-        // Calculate RMS (Root Mean Square) for better audio level detection
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          const amplitude = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
-          sum += amplitude * amplitude;
-        }
-        const rms = Math.sqrt(sum / dataArray.length);
-        const normalizedLevel = Math.min(rms * 3, 1); // Amplify sensitivity
+      // Calculate RMS (Root Mean Square) for better audio level detection
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const amplitude = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
+        sum += amplitude * amplitude;
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
+      const normalizedLevel = Math.min(rms * 3, 1); // Amplify sensitivity
 
-        setAudioLevel(normalizedLevel);
+      setAudioLevel(normalizedLevel);
 
-        animationRef.current = requestAnimationFrame(updateAudioLevel);
-      };
+      animationRef.current = requestAnimationFrame(updateAudioLevel);
+    };
 
     updateAudioLevel();
   };
@@ -385,7 +385,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-clearly-blue">
-                EZNotes.AI
+                EZNotes.pro
               </h1>
             </div>
             <button className="p-2 rounded-md text-gray-600 hover:text-gray-900">
@@ -495,7 +495,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                                     audioLevel * maxHeight * multiplier
                                 )
                               );
-                                                             const opacity = audioLevel > 0.01 ? 1 : 0.2;
+                              const opacity = audioLevel > 0.01 ? 1 : 0.2;
 
                               return (
                                 <div
@@ -515,7 +515,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           Recording... {formatTime(recordingTime)}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Microphone is active • Level: {Math.round(audioLevel * 100)}%
+                          Microphone is active • Level:{" "}
+                          {Math.round(audioLevel * 100)}%
                         </p>
                       </div>
                       <button
