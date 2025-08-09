@@ -613,17 +613,25 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   Upload File
                 </h3>
                 <div
-                  className="upload-area min-h-[280px]"
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onClick={() => fileInputRef.current?.click()}
+                  className={`upload-area min-h-[280px] ${
+                    !!output ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  onDrop={!!output ? undefined : handleDrop}
+                  onDragOver={!!output ? undefined : handleDragOver}
+                  onClick={!!output ? undefined : () => fileInputRef.current?.click()}
                 >
-                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-700 mb-2">
-                    Upload transcript or audio recording
+                  <Upload className={`h-12 w-12 mx-auto mb-4 ${
+                    !!output ? "text-gray-300" : "text-gray-400"
+                  }`} />
+                  <p className={`text-lg font-medium mb-2 ${
+                    !!output ? "text-gray-400" : "text-gray-700"
+                  }`}>
+                    {!!output ? "Upload disabled - Generate notes first" : "Upload transcript or audio recording"}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Drag and drop your file here, or click to browse
+                  <p className={`text-sm ${
+                    !!output ? "text-gray-300" : "text-gray-500"
+                  }`}>
+                    {!!output ? "Complete current generation to upload new files" : "Drag and drop your file here, or click to browse"}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     Supported: .txt, .mp3, .m4a, .wav
@@ -935,6 +943,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 }
               }}
               className="hidden"
+              disabled={!!output}
             />
 
             {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
