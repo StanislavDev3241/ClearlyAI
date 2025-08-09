@@ -355,7 +355,7 @@ function App() {
     const now = new Date();
     const date = now.toISOString().split("T")[0]; // YYYY-MM-DD
     const time = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
-    return `recording_${date}_${time}.webm`;
+    return `recording_${date}_${time}.wav`;
   };
 
   const downloadRecording = () => {
@@ -373,7 +373,7 @@ function App() {
 
   const useRecording = () => {
     if (recordedBlob) {
-      const file = new File([recordedBlob], `recording_${Date.now()}.wav`, {
+      const file = new File([recordedBlob], generateRecordingFilename(), {
         type: "audio/wav",
       });
       setFile(file);
