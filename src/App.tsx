@@ -11,6 +11,7 @@ import {
   Square,
   Play,
   Pause,
+  X,
 } from "lucide-react";
 
 interface OutputData {
@@ -35,11 +36,13 @@ function App() {
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [recordingChunks, setRecordingChunks] = useState<BlobPart[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -148,16 +151,67 @@ function App() {
     }
   };
 
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current && isRecording && !isPaused) {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      stopAudioLevelMonitoring();
+    }
+  };
+
+  const resumeRecording = () => {
+    if (mediaRecorderRef.current && isRecording && isPaused) {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+      
+      // Restart timer
+      intervalRef.current = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+      
+      // Restart audio monitoring
+      if (streamRef.current) {
+        startAudioLevelMonitoring(streamRef.current);
+      }
+    }
+  };
+
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsPaused(false);
 
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
 
       // Stop audio level monitoring
+      stopAudioLevelMonitoring();
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && (isRecording || isPaused)) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsPaused(false);
+      setRecordingTime(0);
+      setRecordingChunks([]);
+      setRecordedBlob(null);
+
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+
+      // Stop streams and audio monitoring
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
       stopAudioLevelMonitoring();
     }
   };
@@ -174,12 +228,19 @@ function App() {
     }
   };
 
+  const generateRecordingFilename = () => {
+    const now = new Date();
+    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const time = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+    return `recording_${date}_${time}.webm`;
+  };
+
   const downloadRecording = () => {
     if (recordedBlob) {
       const url = URL.createObjectURL(recordedBlob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `recording_${new Date().toISOString().split("T")[0]}.wav`;
+      a.download = generateRecordingFilename();
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -202,6 +263,8 @@ function App() {
     setRecordedBlob(null);
     setRecordingTime(0);
     setIsPlaying(false);
+    setIsPaused(false);
+    setRecordingChunks([]);
     stopAudioLevelMonitoring();
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -407,30 +470,105 @@ Your oral health is excellent! Keep up the great work with your daily dental car
           </p>
 
           {/* Upload Section */}
-          <div className="max-w-2xl mx-auto">
-            <div
-              className="upload-area"
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-lg font-medium text-gray-700 mb-2">
-                Upload transcript or audio recording
-              </p>
-              <p className="text-sm text-gray-500">
-                Drag and drop your file here, or click to browse
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Supported: .txt, .mp3, .m4a, .wav
-              </p>
-              {file && (
-                <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-700">
-                    Selected: {file.name}
+          <div className="max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
+              {/* File Upload Area */}
+              <div>
+                <div
+                  className="upload-area"
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-gray-700 mb-2">
+                    Upload transcript or audio recording
                   </p>
+                  <p className="text-sm text-gray-500">
+                    Drag and drop your file here, or click to browse
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Supported: .txt, .mp3, .m4a, .wav
+                  </p>
+                  {file && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm text-green-700">
+                        Selected: {file.name}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+
+              {/* Generation Options & Button */}
+              <div className="space-y-6">
+                {/* Output Selection */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Choose Output Types</h3>
+                  <div className="space-y-3">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={outputSelection.soapNote}
+                        onChange={(e) =>
+                          setOutputSelection((prev) => ({
+                            ...prev,
+                            soapNote: e.target.checked,
+                          }))
+                        }
+                        disabled={!!output || isUploading}
+                        className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <span
+                        className={`text-sm font-medium ${
+                          output || isUploading ? "text-gray-500" : "text-gray-700"
+                        }`}
+                      >
+                        SOAP Note (Professional Clinical Format)
+                      </span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={outputSelection.patientSummary}
+                        onChange={(e) =>
+                          setOutputSelection((prev) => ({
+                            ...prev,
+                            patientSummary: e.target.checked,
+                          }))
+                        }
+                        disabled={!!output || isUploading}
+                        className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <span
+                        className={`text-sm font-medium ${
+                          output || isUploading ? "text-gray-500" : "text-gray-700"
+                        }`}
+                      >
+                        Patient Summary (Plain Language)
+                      </span>
+                    </label>
+                  </div>
+                  {output && (
+                    <p className="text-xs text-gray-500 mt-3">
+                      💡 Click "Generate Another Note" to change these selections
+                    </p>
+                  )}
+                </div>
+
+                {/* Generate Button */}
+                <button
+                  onClick={handleUpload}
+                  disabled={
+                    !file ||
+                    isUploading ||
+                    (!outputSelection.soapNote && !outputSelection.patientSummary)
+                  }
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? "Generating Notes..." : "Generate Notes"}
+                </button>
+              </div>
             </div>
 
             {/* OR Divider */}
@@ -512,20 +650,49 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         </div>
 
                         <p className="text-lg font-medium text-gray-700">
-                          Recording... {formatTime(recordingTime)}
+                          {isPaused ? 'Paused' : 'Recording'}... {formatTime(recordingTime)}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Microphone is active • Level:{" "}
+                          Microphone is {isPaused ? 'paused' : 'active'} • Level:{" "}
                           {Math.round(audioLevel * 100)}%
                         </p>
                       </div>
-                      <button
-                        onClick={stopRecording}
-                        className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
-                      >
-                        <Square className="h-5 w-5 mr-2" />
-                        Stop Recording
-                      </button>
+                      
+                      <div className="flex justify-center space-x-3">
+                        {!isPaused ? (
+                          <button
+                            onClick={pauseRecording}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                          >
+                            <Pause className="h-5 w-5 mr-2" />
+                            Pause
+                          </button>
+                        ) : (
+                          <button
+                            onClick={resumeRecording}
+                            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                          >
+                            <Play className="h-5 w-5 mr-2" />
+                            Resume
+                          </button>
+                        )}
+                        
+                        <button
+                          onClick={stopRecording}
+                          className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                        >
+                          <Square className="h-5 w-5 mr-2" />
+                          Stop
+                        </button>
+                        
+                        <button
+                          onClick={cancelRecording}
+                          className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                        >
+                          <X className="h-5 w-5 mr-2" />
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -597,73 +764,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
 
             {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
 
-            {/* Output Selection */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-3">
-                Select output types:
-              </p>
-              <div className="flex space-x-6">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={outputSelection.soapNote}
-                    onChange={(e) =>
-                      setOutputSelection((prev) => ({
-                        ...prev,
-                        soapNote: e.target.checked,
-                      }))
-                    }
-                    disabled={!!output || isUploading}
-                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <span
-                    className={`text-sm ${
-                      output || isUploading ? "text-gray-500" : "text-gray-700"
-                    }`}
-                  >
-                    SOAP Note
-                  </span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={outputSelection.patientSummary}
-                    onChange={(e) =>
-                      setOutputSelection((prev) => ({
-                        ...prev,
-                        patientSummary: e.target.checked,
-                      }))
-                    }
-                    disabled={!!output || isUploading}
-                    className="mr-2 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <span
-                    className={`text-sm ${
-                      output || isUploading ? "text-gray-500" : "text-gray-700"
-                    }`}
-                  >
-                    Patient Summary
-                  </span>
-                </label>
-              </div>
-              {output && (
-                <p className="text-xs text-gray-500 mt-2">
-                  💡 Click "Generate Another Note" to change these selections
-                </p>
-              )}
-            </div>
 
-            <button
-              onClick={handleUpload}
-              disabled={
-                !file ||
-                isUploading ||
-                (!outputSelection.soapNote && !outputSelection.patientSummary)
-              }
-              className="btn-primary mt-6 w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isUploading ? "Generating Notes..." : "Generate Notes"}
-            </button>
           </div>
 
           {/* Output Section - Moved here */}
@@ -775,6 +876,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     setRecordingTime(0);
                     setIsPlaying(false);
                     setIsRecording(false);
+                    setIsPaused(false);
+                    setRecordingChunks([]);
                     stopAudioLevelMonitoring();
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
