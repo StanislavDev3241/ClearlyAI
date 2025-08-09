@@ -218,7 +218,9 @@ function App() {
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textResponse = await response.text();
-        throw new Error(`Expected JSON response, but received: "${textResponse}". Please check your Make.com webhook configuration.`);
+        throw new Error(
+          `Expected JSON response, but received: "${textResponse}". Please check your Make.com webhook configuration.`
+        );
       }
 
       const result = await response.json();
@@ -408,25 +410,42 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     </div>
                   )}
 
-                  {isRecording && (
-                    <div>
-                      <div className="mb-4">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-3">
-                          <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
-                        </div>
-                        <p className="text-lg font-medium text-gray-700">
-                          Recording... {formatTime(recordingTime)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={stopRecording}
-                        className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
-                      >
-                        <Square className="h-5 w-5 mr-2" />
-                        Stop Recording
-                      </button>
-                    </div>
-                  )}
+                            {isRecording && (
+            <div>
+              <div className="mb-4">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-3 animate-pulse">
+                  <Mic className="h-8 w-8 text-red-500" />
+                </div>
+                
+                {/* Animated Wave Bars */}
+                <div className="flex items-end justify-center space-x-1 mb-3" style={{height: '32px'}}>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '8px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '16px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '12px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '24px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '20px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '28px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '14px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '22px'}}></div>
+                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '10px'}}></div>
+                </div>
+
+                <p className="text-lg font-medium text-gray-700">
+                  Recording... {formatTime(recordingTime)}
+                </p>
+                <p className="text-sm text-gray-500">
+                  Microphone is active
+                </p>
+              </div>
+              <button
+                onClick={stopRecording}
+                className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+              >
+                <Square className="h-5 w-5 mr-2" />
+                Stop Recording
+              </button>
+            </div>
+          )}
 
                   {recordedBlob && !isRecording && (
                     <div>
