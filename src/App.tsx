@@ -198,14 +198,14 @@ function App() {
     }
   };
 
-    const cancelRecording = () => {
+  const cancelRecording = () => {
     // Set cancelling flag before stopping
     setIsCancelling(true);
-    
+
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
     }
-    
+
     // Reset all recording states completely
     setIsRecording(false);
     setIsPaused(false);
@@ -224,12 +224,12 @@ function App() {
       streamRef.current = null;
     }
     stopAudioLevelMonitoring();
-    
+
     // Clear audio element
     if (audioRef.current) {
       audioRef.current.src = "";
     }
-    
+
     // Reset cancelling flag after cleanup
     setTimeout(() => setIsCancelling(false), 100);
   };
@@ -527,31 +527,15 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   Record Audio
                 </h3>
                 <div className="bg-gray-50 rounded-lg p-6 min-h-[280px] flex items-center justify-center">
-                  {!showRecorder && (
-                    <div className="text-center">
-                      <button
-                        onClick={() => setShowRecorder(true)}
-                        className="btn-secondary inline-flex items-center"
-                        disabled={isUploading || !!output}
-                      >
-                        <Mic className="h-5 w-5 mr-2" />
-                        Start Recording
-                      </button>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Record directly on the website
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Recording Interface */}
-                  {showRecorder && !isRecording && !recordedBlob && (
+                  {(!showRecorder || (showRecorder && !isRecording && !recordedBlob)) && (
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-4">
-                        Click the microphone to start recording
+                        {!showRecorder ? 'Record directly on the website' : 'Click the microphone to start recording'}
                       </p>
                       <button
-                        onClick={startRecording}
-                        className="btn-primary inline-flex items-center"
+                        onClick={showRecorder ? startRecording : () => setShowRecorder(true)}
+                        className="btn-secondary text-sm inline-flex items-center"
+                        disabled={isUploading || !!output}
                       >
                         <Mic className="h-5 w-5 mr-2" />
                         Start Recording
