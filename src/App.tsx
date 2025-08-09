@@ -527,15 +527,31 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   Record Audio
                 </h3>
                 <div className="bg-gray-50 rounded-lg p-6 min-h-[280px] flex items-center justify-center">
-                  {(!showRecorder || (showRecorder && !isRecording && !recordedBlob)) && (
+                                    {!showRecorder && (
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-4">
-                        {!showRecorder ? 'Record directly on the website' : 'Click the microphone to start recording'}
+                        Record directly on the website
                       </p>
                       <button
-                        onClick={showRecorder ? startRecording : () => setShowRecorder(true)}
-                        className="btn-secondary text-sm inline-flex items-center"
+                        onClick={() => setShowRecorder(true)}
+                        className="btn-secondary inline-flex items-center"
                         disabled={isUploading || !!output}
+                      >
+                        <Mic className="h-5 w-5 mr-2" />
+                        Start Recording
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Recording Interface */}
+                  {showRecorder && !isRecording && !recordedBlob && (
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 mb-4">
+                        Click the microphone to start recording
+                      </p>
+                      <button
+                        onClick={startRecording}
+                        className="btn-primary inline-flex items-center"
                       >
                         <Mic className="h-5 w-5 mr-2" />
                         Start Recording
