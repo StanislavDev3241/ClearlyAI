@@ -42,6 +42,7 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -123,13 +124,16 @@ function App() {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/wav" });
-        setRecordedBlob(blob);
+        // Only create blob if not cancelling
+        if (!isCancelling) {
+          const blob = new Blob(chunks, { type: "audio/wav" });
+          setRecordedBlob(blob);
 
-        // Create audio URL for playback
-        const audioUrl = URL.createObjectURL(blob);
-        if (audioRef.current) {
-          audioRef.current.src = audioUrl;
+          // Create audio URL for playback
+          const audioUrl = URL.createObjectURL(blob);
+          if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+          }
         }
 
         // Stop the stream
@@ -194,7 +198,10 @@ function App() {
     }
   };
 
-  const cancelRecording = () => {
+    const cancelRecording = () => {
+    // Set cancelling flag before stopping
+    setIsCancelling(true);
+    
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
     }
@@ -222,6 +229,9 @@ function App() {
     if (audioRef.current) {
       audioRef.current.src = "";
     }
+    
+    // Reset cancelling flag after cleanup
+    setTimeout(() => setIsCancelling(false), 100);
   };
 
   const playRecording = () => {
@@ -272,6 +282,7 @@ function App() {
     setRecordingTime(0);
     setIsPlaying(false);
     setIsPaused(false);
+    setIsCancelling(false);
     stopAudioLevelMonitoring();
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -893,6 +904,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     setIsPlaying(false);
                     setIsRecording(false);
                     setIsPaused(false);
+                    setIsCancelling(false);
                     stopAudioLevelMonitoring();
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
