@@ -39,12 +39,62 @@ function App() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+
+  // Audio level monitoring
+  const startAudioLevelMonitoring = (stream: MediaStream) => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+    
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.3;
+    source.connect(analyser);
+    
+    audioContextRef.current = audioContext;
+    analyserRef.current = analyser;
+    
+    const updateAudioLevel = () => {
+      if (!analyser) return;
+      
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(dataArray);
+      
+      // Calculate average audio level
+      const average = dataArray.reduce((acc, value) => acc + value, 0) / dataArray.length;
+      const normalizedLevel = Math.min(average / 100, 1); // Normalize to 0-1
+      
+      setAudioLevel(normalizedLevel);
+      
+      if (isRecording) {
+        animationRef.current = requestAnimationFrame(updateAudioLevel);
+      }
+    };
+    
+    updateAudioLevel();
+  };
+
+  const stopAudioLevelMonitoring = () => {
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+  };
 
   // Recording functions
   const startRecording = async () => {
@@ -54,6 +104,9 @@ function App() {
 
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
+
+      // Start audio level monitoring
+      startAudioLevelMonitoring(stream);
 
       const chunks: BlobPart[] = [];
 
@@ -99,6 +152,9 @@ function App() {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+
+      // Stop audio level monitoring
+      stopAudioLevelMonitoring();
     }
   };
 
@@ -142,6 +198,7 @@ function App() {
     setRecordedBlob(null);
     setRecordingTime(0);
     setIsPlaying(false);
+    stopAudioLevelMonitoring();
     if (audioRef.current) {
       audioRef.current.src = "";
     }
@@ -410,42 +467,53 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     </div>
                   )}
 
-                            {isRecording && (
-            <div>
-              <div className="mb-4">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-3 animate-pulse">
-                  <Mic className="h-8 w-8 text-red-500" />
-                </div>
-                
-                {/* Animated Wave Bars */}
-                <div className="flex items-end justify-center space-x-1 mb-3" style={{height: '32px'}}>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '8px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '16px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '12px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '24px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '20px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '28px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '14px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '22px'}}></div>
-                  <div className="wave-bar w-1 bg-red-500 rounded-full" style={{height: '10px'}}></div>
-                </div>
+                  {isRecording && (
+                    <div>
+                      <div className="mb-4">
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-3 animate-pulse">
+                          <Mic className="h-8 w-8 text-red-500" />
+                        </div>
 
-                <p className="text-lg font-medium text-gray-700">
-                  Recording... {formatTime(recordingTime)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Microphone is active
-                </p>
-              </div>
-              <button
-                onClick={stopRecording}
-                className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
-              >
-                <Square className="h-5 w-5 mr-2" />
-                Stop Recording
-              </button>
-            </div>
-          )}
+                        {/* Real-time Audio Level Bars */}
+                        <div
+                          className="flex items-end justify-center space-x-1 mb-3"
+                          style={{ height: "32px" }}
+                        >
+                          {[0.3, 0.7, 0.5, 1.0, 0.8, 1.2, 0.6, 0.9, 0.4].map((multiplier, index) => {
+                            const baseHeight = 4;
+                            const maxHeight = 28;
+                            const height = Math.max(baseHeight, Math.min(maxHeight, baseHeight + (audioLevel * maxHeight * multiplier)));
+                            const opacity = audioLevel > 0.05 ? 1 : 0.3;
+                            
+                            return (
+                              <div
+                                key={index}
+                                className="w-1 bg-red-500 rounded-full transition-all duration-75 ease-out"
+                                style={{ 
+                                  height: `${height}px`,
+                                  opacity: opacity
+                                }}
+                              ></div>
+                            );
+                          })}
+                        </div>
+
+                        <p className="text-lg font-medium text-gray-700">
+                          Recording... {formatTime(recordingTime)}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Microphone is active
+                        </p>
+                      </div>
+                      <button
+                        onClick={stopRecording}
+                        className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                      >
+                        <Square className="h-5 w-5 mr-2" />
+                        Stop Recording
+                      </button>
+                    </div>
+                  )}
 
                   {recordedBlob && !isRecording && (
                     <div>
@@ -693,6 +761,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     setRecordingTime(0);
                     setIsPlaying(false);
                     setIsRecording(false);
+                    stopAudioLevelMonitoring();
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
                     }
