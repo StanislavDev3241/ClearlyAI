@@ -214,6 +214,13 @@ function App() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        throw new Error(`Expected JSON response, but received: "${textResponse}". Please check your Make.com webhook configuration.`);
+      }
+
       const result = await response.json();
 
       // Handle the response from Make.com
