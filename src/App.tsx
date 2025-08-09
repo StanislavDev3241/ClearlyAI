@@ -42,7 +42,7 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [recordingChunks, setRecordingChunks] = useState<BlobPart[]>([]);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -155,7 +155,7 @@ function App() {
     if (mediaRecorderRef.current && isRecording && !isPaused) {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
-      
+
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -167,12 +167,12 @@ function App() {
     if (mediaRecorderRef.current && isRecording && isPaused) {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      
+
       // Restart timer
       intervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
-      
+
       // Restart audio monitoring
       if (streamRef.current) {
         startAudioLevelMonitoring(streamRef.current);
@@ -201,7 +201,6 @@ function App() {
       setIsRecording(false);
       setIsPaused(false);
       setRecordingTime(0);
-      setRecordingChunks([]);
       setRecordedBlob(null);
 
       if (intervalRef.current) {
@@ -210,7 +209,7 @@ function App() {
 
       // Stop streams and audio monitoring
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
       stopAudioLevelMonitoring();
     }
@@ -230,8 +229,8 @@ function App() {
 
   const generateRecordingFilename = () => {
     const now = new Date();
-    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const time = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+    const date = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const time = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
     return `recording_${date}_${time}.webm`;
   };
 
@@ -264,7 +263,6 @@ function App() {
     setRecordingTime(0);
     setIsPlaying(false);
     setIsPaused(false);
-    setRecordingChunks([]);
     stopAudioLevelMonitoring();
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -504,7 +502,9 @@ Your oral health is excellent! Keep up the great work with your daily dental car
               <div className="space-y-6">
                 {/* Output Selection */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Choose Output Types</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Choose Output Types
+                  </h3>
                   <div className="space-y-3">
                     <label className="flex items-center">
                       <input
@@ -521,7 +521,9 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       />
                       <span
                         className={`text-sm font-medium ${
-                          output || isUploading ? "text-gray-500" : "text-gray-700"
+                          output || isUploading
+                            ? "text-gray-500"
+                            : "text-gray-700"
                         }`}
                       >
                         SOAP Note (Professional Clinical Format)
@@ -542,7 +544,9 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       />
                       <span
                         className={`text-sm font-medium ${
-                          output || isUploading ? "text-gray-500" : "text-gray-700"
+                          output || isUploading
+                            ? "text-gray-500"
+                            : "text-gray-700"
                         }`}
                       >
                         Patient Summary (Plain Language)
@@ -551,7 +555,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   </div>
                   {output && (
                     <p className="text-xs text-gray-500 mt-3">
-                      💡 Click "Generate Another Note" to change these selections
+                      💡 Click "Generate Another Note" to change these
+                      selections
                     </p>
                   )}
                 </div>
@@ -562,7 +567,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   disabled={
                     !file ||
                     isUploading ||
-                    (!outputSelection.soapNote && !outputSelection.patientSummary)
+                    (!outputSelection.soapNote &&
+                      !outputSelection.patientSummary)
                   }
                   className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -650,14 +656,15 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         </div>
 
                         <p className="text-lg font-medium text-gray-700">
-                          {isPaused ? 'Paused' : 'Recording'}... {formatTime(recordingTime)}
+                          {isPaused ? "Paused" : "Recording"}...{" "}
+                          {formatTime(recordingTime)}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Microphone is {isPaused ? 'paused' : 'active'} • Level:{" "}
-                          {Math.round(audioLevel * 100)}%
+                          Microphone is {isPaused ? "paused" : "active"} •
+                          Level: {Math.round(audioLevel * 100)}%
                         </p>
                       </div>
-                      
+
                       <div className="flex justify-center space-x-3">
                         {!isPaused ? (
                           <button
@@ -676,7 +683,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                             Resume
                           </button>
                         )}
-                        
+
                         <button
                           onClick={stopRecording}
                           className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
@@ -684,7 +691,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           <Square className="h-5 w-5 mr-2" />
                           Stop
                         </button>
-                        
+
                         <button
                           onClick={cancelRecording}
                           className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
@@ -763,8 +770,6 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             />
 
             {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-
-
           </div>
 
           {/* Output Section - Moved here */}
@@ -877,7 +882,6 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     setIsPlaying(false);
                     setIsRecording(false);
                     setIsPaused(false);
-                    setRecordingChunks([]);
                     stopAudioLevelMonitoring();
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
