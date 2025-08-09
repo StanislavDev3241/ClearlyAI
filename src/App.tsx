@@ -613,7 +613,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   Upload File
                 </h3>
                 <div
-                  className="upload-area"
+                  className="upload-area min-h-[280px]"
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onClick={() => fileInputRef.current?.click()}
@@ -660,7 +660,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           setShowRecorder(true);
                           setTimeout(startRecording, 100);
                         }}
-                        className="btn-secondary inline-flex items-center"
+                        className="btn-primary inline-flex items-center"
                         disabled={isUploading || !!output}
                       >
                         <Mic className="h-5 w-5 mr-2" />
