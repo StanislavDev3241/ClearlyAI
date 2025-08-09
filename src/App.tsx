@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Upload,
   FileText,
@@ -53,6 +53,19 @@ function App() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
 
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log('🔄 State changed:', {
+      showRecorder,
+      isRecording,
+      isPaused,
+      recordedBlob: !!recordedBlob,
+      recordingTime,
+      isPlaying,
+      isCancelling
+    });
+  }, [showRecorder, isRecording, isPaused, recordedBlob, recordingTime, isPlaying, isCancelling]);
+
   // Audio level monitoring
   const startAudioLevelMonitoring = (stream: MediaStream) => {
     const audioContext = new (window.AudioContext ||
@@ -105,12 +118,18 @@ function App() {
 
   // Recording functions
   const startRecording = async () => {
+    console.log('🎯 startRecording() called');
+    console.log('  - Current state: showRecorder=', showRecorder, 'isRecording=', isRecording, 'recordedBlob=', !!recordedBlob);
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('  ✅ Microphone access granted');
+      
       streamRef.current = stream;
 
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
+      console.log('  📹 MediaRecorder created');
 
       // Start audio level monitoring
       startAudioLevelMonitoring(stream);
@@ -124,9 +143,11 @@ function App() {
       };
 
       mediaRecorder.onstop = () => {
+        console.log('  📹 MediaRecorder onstop triggered, isCancelling=', isCancelling);
         // Only create blob if not cancelling
         if (!isCancelling) {
           const blob = new Blob(chunks, { type: "audio/wav" });
+          console.log('  ✅ Creating recordedBlob from chunks, size:', blob.size);
           setRecordedBlob(blob);
 
           // Create audio URL for playback
@@ -134,6 +155,8 @@ function App() {
           if (audioRef.current) {
             audioRef.current.src = audioUrl;
           }
+        } else {
+          console.log('  ❌ Cancelled - not creating recordedBlob');
         }
 
         // Stop the stream
@@ -141,6 +164,8 @@ function App() {
       };
 
       mediaRecorder.start();
+      console.log('  ▶️ MediaRecorder started');
+      
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -148,28 +173,40 @@ function App() {
       intervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
+      
+      console.log('  ✅ Recording state updated - isRecording=true, recordingTime=0');
     } catch (err) {
       setError("Could not access microphone. Please allow microphone access.");
-      console.error("Error accessing microphone:", err);
+      console.error("❌ Error accessing microphone:", err);
     }
   };
 
   const pauseRecording = () => {
+    console.log('⏸️ pauseRecording() called');
+    console.log('  - Current state: isRecording=', isRecording, 'isPaused=', isPaused);
+    
     if (mediaRecorderRef.current && isRecording && !isPaused) {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
+      console.log('  ✅ Recording paused, isPaused=true');
 
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
       stopAudioLevelMonitoring();
+    } else {
+      console.log('  ❌ Cannot pause - conditions not met');
     }
   };
 
   const resumeRecording = () => {
+    console.log('▶️ resumeRecording() called');
+    console.log('  - Current state: isRecording=', isRecording, 'isPaused=', isPaused);
+    
     if (mediaRecorderRef.current && isRecording && isPaused) {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
+      console.log('  ✅ Recording resumed, isPaused=false');
 
       // Restart timer
       intervalRef.current = setInterval(() => {
@@ -180,14 +217,20 @@ function App() {
       if (streamRef.current) {
         startAudioLevelMonitoring(streamRef.current);
       }
+    } else {
+      console.log('  ❌ Cannot resume - conditions not met');
     }
   };
 
   const stopRecording = () => {
+    console.log('⏹️ stopRecording() called');
+    console.log('  - Current state: isRecording=', isRecording, 'isPaused=', isPaused);
+    
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setIsPaused(false);
+      console.log('  ✅ Recording stopped, isRecording=false, isPaused=false');
 
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -195,15 +238,22 @@ function App() {
 
       // Stop audio level monitoring
       stopAudioLevelMonitoring();
+    } else {
+      console.log('  ❌ Cannot stop - conditions not met');
     }
   };
 
   const cancelRecording = () => {
+    console.log('❌ cancelRecording() called');
+    console.log('  - Current state: isRecording=', isRecording, 'isPaused=', isPaused, 'recordedBlob=', !!recordedBlob);
+    
     // Set cancelling flag before stopping
     setIsCancelling(true);
+    console.log('  🚫 Setting isCancelling=true');
 
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
+      console.log('  📹 MediaRecorder.stop() called');
     }
 
     // Reset all recording states completely
@@ -213,6 +263,7 @@ function App() {
     setRecordedBlob(null);
     // Don't hide recorder interface - stay in recording state like Record Again
     setIsPlaying(false);
+    console.log('  ✅ Recording states reset: isRecording=false, isPaused=false, recordingTime=0, recordedBlob=null');
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -222,6 +273,7 @@ function App() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
+      console.log('  🎤 Stream tracks stopped and cleared');
     }
     stopAudioLevelMonitoring();
 
@@ -231,7 +283,10 @@ function App() {
     }
 
     // Reset cancelling flag after cleanup
-    setTimeout(() => setIsCancelling(false), 100);
+    setTimeout(() => {
+      setIsCancelling(false);
+      console.log('  🔄 isCancelling reset to false');
+    }, 100);
   };
 
   const playRecording = () => {
@@ -278,6 +333,9 @@ function App() {
   };
 
   const clearRecording = () => {
+    console.log('🔄 clearRecording() called');
+    console.log('  - Current state: recordedBlob=', !!recordedBlob, 'isPlaying=', isPlaying, 'recordingTime=', recordingTime);
+    
     setRecordedBlob(null);
     setRecordingTime(0);
     setIsPlaying(false);
@@ -287,6 +345,8 @@ function App() {
     if (audioRef.current) {
       audioRef.current.src = "";
     }
+    
+    console.log('  ✅ All recording states cleared');
   };
 
   const formatTime = (seconds: number) => {
@@ -534,6 +594,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       </p>
                       <button
                         onClick={() => {
+                          console.log('🖱️ Initial Start Recording button clicked');
+                          console.log('  - Setting showRecorder=true, then calling startRecording after 100ms');
                           setShowRecorder(true);
                           setTimeout(startRecording, 100);
                         }}
@@ -553,7 +615,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         Click the microphone to start recording
                       </p>
                       <button
-                        onClick={startRecording}
+                        onClick={() => {
+                          console.log('🖱️ Secondary Start Recording button clicked (in recording interface)');
+                          startRecording();
+                        }}
                         className="btn-primary inline-flex items-center"
                       >
                         <Mic className="h-5 w-5 mr-2" />
@@ -614,7 +679,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       <div className="flex justify-center space-x-2 flex-wrap">
                         {!isPaused ? (
                           <button
-                            onClick={pauseRecording}
+                            onClick={() => {
+                    console.log('🖱️ Pause button clicked');
+                    pauseRecording();
+                  }}
                             className="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                           >
                             <Pause className="h-4 w-4 mr-1" />
@@ -622,7 +690,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           </button>
                         ) : (
                           <button
-                            onClick={resumeRecording}
+                            onClick={() => {
+                    console.log('🖱️ Resume button clicked');
+                    resumeRecording();
+                  }}
                             className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                           >
                             <Play className="h-4 w-4 mr-1" />
@@ -631,7 +702,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         )}
 
                         <button
-                          onClick={stopRecording}
+                          onClick={() => {
+                  console.log('🖱️ Stop button clicked');
+                  stopRecording();
+                }}
                           className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                         >
                           <Square className="h-4 w-4 mr-1" />
@@ -639,7 +713,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         </button>
 
                         <button
-                          onClick={cancelRecording}
+                          onClick={() => {
+                  console.log('🖱️ Cancel button clicked');
+                  cancelRecording();
+                }}
                           className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                         >
                           <X className="h-4 w-4 mr-1" />
@@ -686,7 +763,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         </button>
 
                         <button
-                          onClick={clearRecording}
+                          onClick={() => {
+                  console.log('🖱️ Record Again button clicked');
+                  clearRecording();
+                }}
                           className="btn-secondary text-sm"
                         >
                           Record Again
@@ -893,6 +973,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
               <div className="text-center mt-8">
                 <button
                   onClick={() => {
+                    console.log('🔄 Generate Another Note button clicked - resetting everything');
                     setFile(null);
                     setOutput(null);
                     setError(null);
@@ -915,6 +996,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     if (audioRef.current) {
                       audioRef.current.src = "";
                     }
+                    console.log('  ✅ All states reset to initial values');
                   }}
                   className="btn-secondary"
                 >
