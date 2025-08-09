@@ -52,34 +52,38 @@ function App() {
 
   // Audio level monitoring
   const startAudioLevelMonitoring = (stream: MediaStream) => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
     const analyser = audioContext.createAnalyser();
     const source = audioContext.createMediaStreamSource(stream);
-    
+
     analyser.fftSize = 256;
     analyser.smoothingTimeConstant = 0.3;
     source.connect(analyser);
-    
+
     audioContextRef.current = audioContext;
     analyserRef.current = analyser;
-    
-    const updateAudioLevel = () => {
-      if (!analyser) return;
-      
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(dataArray);
-      
-      // Calculate average audio level
-      const average = dataArray.reduce((acc, value) => acc + value, 0) / dataArray.length;
-      const normalizedLevel = Math.min(average / 100, 1); // Normalize to 0-1
-      
-      setAudioLevel(normalizedLevel);
-      
-      if (isRecording) {
+
+          const updateAudioLevel = () => {
+        if (!analyser) return;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteTimeDomainData(dataArray); // Use time domain for better voice detection
+
+        // Calculate RMS (Root Mean Square) for better audio level detection
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const amplitude = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
+          sum += amplitude * amplitude;
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const normalizedLevel = Math.min(rms * 3, 1); // Amplify sensitivity
+
+        setAudioLevel(normalizedLevel);
+
         animationRef.current = requestAnimationFrame(updateAudioLevel);
-      }
-    };
-    
+      };
+
     updateAudioLevel();
   };
 
@@ -479,30 +483,39 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           className="flex items-end justify-center space-x-1 mb-3"
                           style={{ height: "32px" }}
                         >
-                          {[0.3, 0.7, 0.5, 1.0, 0.8, 1.2, 0.6, 0.9, 0.4].map((multiplier, index) => {
-                            const baseHeight = 4;
-                            const maxHeight = 28;
-                            const height = Math.max(baseHeight, Math.min(maxHeight, baseHeight + (audioLevel * maxHeight * multiplier)));
-                            const opacity = audioLevel > 0.05 ? 1 : 0.3;
-                            
-                            return (
-                              <div
-                                key={index}
-                                className="w-1 bg-red-500 rounded-full transition-all duration-75 ease-out"
-                                style={{ 
-                                  height: `${height}px`,
-                                  opacity: opacity
-                                }}
-                              ></div>
-                            );
-                          })}
+                          {[0.3, 0.7, 0.5, 1.0, 0.8, 1.2, 0.6, 0.9, 0.4].map(
+                            (multiplier, index) => {
+                              const baseHeight = 4;
+                              const maxHeight = 28;
+                              const height = Math.max(
+                                baseHeight,
+                                Math.min(
+                                  maxHeight,
+                                  baseHeight +
+                                    audioLevel * maxHeight * multiplier
+                                )
+                              );
+                                                             const opacity = audioLevel > 0.01 ? 1 : 0.2;
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="w-1 bg-red-500 rounded-full transition-all duration-75 ease-out"
+                                  style={{
+                                    height: `${height}px`,
+                                    opacity: opacity,
+                                  }}
+                                ></div>
+                              );
+                            }
+                          )}
                         </div>
 
                         <p className="text-lg font-medium text-gray-700">
                           Recording... {formatTime(recordingTime)}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Microphone is active
+                          Microphone is active • Level: {Math.round(audioLevel * 100)}%
                         </p>
                       </div>
                       <button
