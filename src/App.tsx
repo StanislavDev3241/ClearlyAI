@@ -43,7 +43,6 @@ function App() {
   const [showRecorder, setShowRecorder] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
 
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -472,6 +471,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             <div className="grid md:grid-cols-2 gap-8 items-start">
               {/* File Upload Area */}
               <div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">Upload File</h3>
                 <div
                   className="upload-area"
                   onDrop={handleDrop}
@@ -498,110 +498,29 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 </div>
               </div>
 
-              {/* Generation Options & Button */}
-              <div className="space-y-6">
-                {/* Output Selection */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Choose Output Types
-                  </h3>
-                  <div className="space-y-3">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={outputSelection.soapNote}
-                        onChange={(e) =>
-                          setOutputSelection((prev) => ({
-                            ...prev,
-                            soapNote: e.target.checked,
-                          }))
-                        }
-                        disabled={!!output || isUploading}
-                        className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-                      <span
-                        className={`text-sm font-medium ${
-                          output || isUploading
-                            ? "text-gray-500"
-                            : "text-gray-700"
-                        }`}
+              {/* Recording Section */}
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">Record Audio</h3>
+                <div className="bg-gray-50 rounded-lg p-6 min-h-[280px] flex items-center justify-center">
+                  {!showRecorder && (
+                    <div className="text-center">
+                      <button
+                        onClick={() => setShowRecorder(true)}
+                        className="btn-secondary inline-flex items-center"
+                        disabled={isUploading || !!output}
                       >
-                        SOAP Note (Professional Clinical Format)
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={outputSelection.patientSummary}
-                        onChange={(e) =>
-                          setOutputSelection((prev) => ({
-                            ...prev,
-                            patientSummary: e.target.checked,
-                          }))
-                        }
-                        disabled={!!output || isUploading}
-                        className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-                      <span
-                        className={`text-sm font-medium ${
-                          output || isUploading
-                            ? "text-gray-500"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        Patient Summary (Plain Language)
-                      </span>
-                    </label>
-                  </div>
-                  {output && (
-                    <p className="text-xs text-gray-500 mt-3">
-                      💡 Click "Generate Another Note" to change these
-                      selections
-                    </p>
+                        <Mic className="h-5 w-5 mr-2" />
+                        Start Recording
+                      </button>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Record directly on the website
+                      </p>
+                    </div>
                   )}
-                </div>
 
-                {/* Generate Button */}
-                <button
-                  onClick={handleUpload}
-                  disabled={
-                    !file ||
-                    isUploading ||
-                    (!outputSelection.soapNote &&
-                      !outputSelection.patientSummary)
-                  }
-                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isUploading ? "Generating Notes..." : "Generate Notes"}
-                </button>
-              </div>
-            </div>
-
-            {/* OR Divider */}
-            <div className="flex items-center my-6">
-              <div className="flex-1 border-t border-gray-300"></div>
-              <span className="px-4 text-sm text-gray-500">OR</span>
-              <div className="flex-1 border-t border-gray-300"></div>
-            </div>
-
-            {/* Record Audio Button */}
-            <div className="text-center mb-6">
-              <button
-                onClick={() => setShowRecorder(!showRecorder)}
-                className="btn-secondary inline-flex items-center"
-                disabled={isUploading || !!output}
-              >
-                <Mic className="h-5 w-5 mr-2" />
-                Record Audio
-              </button>
-            </div>
-
-            {/* Recording Interface */}
-            {showRecorder && (
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <div className="text-center">
-                  {!isRecording && !recordedBlob && (
-                    <div>
+                  {/* Recording Interface */}
+                  {showRecorder && !isRecording && !recordedBlob && (
+                    <div className="text-center">
                       <p className="text-sm text-gray-600 mb-4">
                         Click the microphone to start recording
                       </p>
@@ -615,22 +534,22 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     </div>
                   )}
 
-                  {isRecording && (
-                    <div>
+                  {showRecorder && isRecording && (
+                    <div className="w-full text-center">
                       <div className="mb-4">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-3 animate-pulse">
-                          <Mic className="h-8 w-8 text-red-500" />
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-3 animate-pulse">
+                          <Mic className="h-6 w-6 text-red-500" />
                         </div>
 
                         {/* Real-time Audio Level Bars */}
                         <div
                           className="flex items-end justify-center space-x-1 mb-3"
-                          style={{ height: "32px" }}
+                          style={{ height: "24px" }}
                         >
                           {[0.3, 0.7, 0.5, 1.0, 0.8, 1.2, 0.6, 0.9, 0.4].map(
                             (multiplier, index) => {
-                              const baseHeight = 4;
-                              const maxHeight = 28;
+                              const baseHeight = 3;
+                              const maxHeight = 20;
                               const height = Math.max(
                                 baseHeight,
                                 Math.min(
@@ -655,64 +574,63 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           )}
                         </div>
 
-                        <p className="text-lg font-medium text-gray-700">
+                        <p className="text-base font-medium text-gray-700">
                           {isPaused ? "Paused" : "Recording"}...{" "}
                           {formatTime(recordingTime)}
                         </p>
-                        <p className="text-sm text-gray-500">
-                          Microphone is {isPaused ? "paused" : "active"} •
+                        <p className="text-xs text-gray-500">
                           Level: {Math.round(audioLevel * 100)}%
                         </p>
                       </div>
 
-                      <div className="flex justify-center space-x-3">
+                      <div className="flex justify-center space-x-2 flex-wrap">
                         {!isPaused ? (
                           <button
                             onClick={pauseRecording}
-                            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                           >
-                            <Pause className="h-5 w-5 mr-2" />
+                            <Pause className="h-4 w-4 mr-1" />
                             Pause
                           </button>
                         ) : (
                           <button
                             onClick={resumeRecording}
-                            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                            className="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                           >
-                            <Play className="h-5 w-5 mr-2" />
+                            <Play className="h-4 w-4 mr-1" />
                             Resume
                           </button>
                         )}
 
                         <button
                           onClick={stopRecording}
-                          className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                          className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                         >
-                          <Square className="h-5 w-5 mr-2" />
+                          <Square className="h-4 w-4 mr-1" />
                           Stop
                         </button>
 
                         <button
                           onClick={cancelRecording}
-                          className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                          className="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-3 rounded-lg inline-flex items-center text-sm"
                         >
-                          <X className="h-5 w-5 mr-2" />
+                          <X className="h-4 w-4 mr-1" />
                           Cancel
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {recordedBlob && !isRecording && (
-                    <div>
+                  {showRecorder && recordedBlob && !isRecording && (
+                    <div className="w-full text-center">
                       <p className="text-sm text-gray-600 mb-4">
                         Recording completed ({formatTime(recordingTime)})
                       </p>
 
-                      <div className="flex justify-center space-x-3 mb-4">
+                      <div className="flex justify-center space-x-2 mb-4 flex-wrap">
                         <button
                           onClick={playRecording}
-                          className="btn-secondary inline-flex items-center"
+                          className="btn-secondary inline-flex items-center text-sm"
                         >
                           {isPlaying ? (
                             <Pause className="h-4 w-4 mr-1" />
@@ -724,37 +642,117 @@ Your oral health is excellent! Keep up the great work with your daily dental car
 
                         <button
                           onClick={downloadRecording}
-                          className="btn-secondary inline-flex items-center"
+                          className="btn-secondary inline-flex items-center text-sm"
                         >
                           <Download className="h-4 w-4 mr-1" />
                           Download
                         </button>
                       </div>
 
-                      <div className="flex justify-center space-x-3">
-                        <button onClick={useRecording} className="btn-primary">
+                      <div className="flex justify-center space-x-2 flex-wrap">
+                        <button
+                          onClick={useRecording}
+                          className="btn-primary text-sm"
+                        >
                           Use This Recording
                         </button>
 
                         <button
                           onClick={clearRecording}
-                          className="btn-secondary"
+                          className="btn-secondary text-sm"
                         >
                           Record Again
                         </button>
                       </div>
                     </div>
                   )}
-                </div>
 
-                {/* Hidden audio element for playback */}
-                <audio
-                  ref={audioRef}
-                  onEnded={() => setIsPlaying(false)}
-                  style={{ display: "none" }}
-                />
+                  {/* Hidden audio element for playback */}
+                  <audio
+                    ref={audioRef}
+                    onEnded={() => setIsPlaying(false)}
+                    style={{ display: "none" }}
+                  />
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Output Selection & Generate Button */}
+            <div className="mt-8 max-w-2xl mx-auto">
+              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                  Choose Output Types
+                </h3>
+                <div className="space-y-3 mb-6">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={outputSelection.soapNote}
+                      onChange={(e) =>
+                        setOutputSelection((prev) => ({
+                          ...prev,
+                          soapNote: e.target.checked,
+                        }))
+                      }
+                      disabled={!!output || isUploading}
+                      className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <span
+                      className={`text-sm font-medium ${
+                        output || isUploading
+                          ? "text-gray-500"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      SOAP Note (Professional Clinical Format)
+                    </span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={outputSelection.patientSummary}
+                      onChange={(e) =>
+                        setOutputSelection((prev) => ({
+                          ...prev,
+                          patientSummary: e.target.checked,
+                        }))
+                      }
+                      disabled={!!output || isUploading}
+                      className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <span
+                      className={`text-sm font-medium ${
+                        output || isUploading
+                          ? "text-gray-500"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      Patient Summary (Plain Language)
+                    </span>
+                  </label>
+                </div>
+                {output && (
+                  <p className="text-xs text-gray-500 mb-4 text-center">
+                    💡 Click "Generate Another Note" to change these
+                    selections
+                  </p>
+                )}
+
+                {/* Generate Button */}
+                <button
+                  onClick={handleUpload}
+                  disabled={
+                    !file ||
+                    isUploading ||
+                    (!outputSelection.soapNote &&
+                      !outputSelection.patientSummary)
+                  }
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? "Generating Notes..." : "Generate Notes"}
+                </button>
+              </div>
+            </div>
 
             <input
               ref={fileInputRef}
