@@ -211,7 +211,7 @@ function App() {
     setIsPaused(false);
     setRecordingTime(0);
     setRecordedBlob(null);
-    setShowRecorder(false); // Hide the recorder interface
+    // Don't hide recorder interface - stay in recording state like Record Again
     setIsPlaying(false);
 
     if (intervalRef.current) {
@@ -527,13 +527,16 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   Record Audio
                 </h3>
                 <div className="bg-gray-50 rounded-lg p-6 min-h-[280px] flex items-center justify-center">
-                                    {!showRecorder && (
+                  {!showRecorder && (
                     <div className="text-center">
                       <p className="text-sm text-gray-600 mb-4">
                         Record directly on the website
                       </p>
                       <button
-                        onClick={() => setShowRecorder(true)}
+                        onClick={() => {
+                          setShowRecorder(true);
+                          setTimeout(startRecording, 100);
+                        }}
                         className="btn-secondary inline-flex items-center"
                         disabled={isUploading || !!output}
                       >
