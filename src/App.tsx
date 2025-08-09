@@ -42,7 +42,7 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [isCancelling, setIsCancelling] = useState(false);
+  const isCancellingRef = useRef(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -62,7 +62,7 @@ function App() {
       recordedBlob: !!recordedBlob,
       recordingTime,
       isPlaying,
-      isCancelling,
+      isCancelling: isCancellingRef.current,
     });
   }, [
     showRecorder,
@@ -71,7 +71,6 @@ function App() {
     recordedBlob,
     recordingTime,
     isPlaying,
-    isCancelling,
   ]);
 
   // Audio level monitoring
@@ -160,10 +159,10 @@ function App() {
       mediaRecorder.onstop = () => {
         console.log(
           "  📹 MediaRecorder onstop triggered, isCancelling=",
-          isCancelling
+          isCancellingRef.current
         );
         // Only create blob if not cancelling
-        if (!isCancelling) {
+        if (!isCancellingRef.current) {
           const blob = new Blob(chunks, { type: "audio/wav" });
           console.log(
             "  ✅ Creating recordedBlob from chunks, size:",
@@ -182,11 +181,11 @@ function App() {
 
         // Stop the stream
         stream.getTracks().forEach((track) => track.stop());
-        
+
         // Reset cancelling flag after onstop is complete
-        if (isCancelling) {
+        if (isCancellingRef.current) {
           setTimeout(() => {
-            setIsCancelling(false);
+            isCancellingRef.current = false;
             console.log("  🔄 isCancelling reset to false (after onstop)");
           }, 100);
         }
@@ -301,7 +300,7 @@ function App() {
     );
 
     // Set cancelling flag before stopping
-    setIsCancelling(true);
+    isCancellingRef.current = true;
     console.log("  🚫 Setting isCancelling=true");
 
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
@@ -337,7 +336,7 @@ function App() {
       audioRef.current.src = "";
     }
 
-          // Note: isCancelling flag will be reset in MediaRecorder.onstop event
+    // Note: isCancelling flag will be reset in MediaRecorder.onstop event
   };
 
   const playRecording = () => {
@@ -398,7 +397,7 @@ function App() {
     setRecordingTime(0);
     setIsPlaying(false);
     setIsPaused(false);
-    setIsCancelling(false);
+    isCancellingRef.current = false;
     stopAudioLevelMonitoring();
     if (audioRef.current) {
       audioRef.current.src = "";
@@ -1054,7 +1053,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     setIsPlaying(false);
                     setIsRecording(false);
                     setIsPaused(false);
-                    setIsCancelling(false);
+                    isCancellingRef.current = false;
                     stopAudioLevelMonitoring();
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
