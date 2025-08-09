@@ -197,20 +197,30 @@ function App() {
   const cancelRecording = () => {
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsPaused(false);
-      setRecordingTime(0);
-      setRecordedBlob(null);
+    }
+    
+    // Reset all recording states completely
+    setIsRecording(false);
+    setIsPaused(false);
+    setRecordingTime(0);
+    setRecordedBlob(null);
+    setShowRecorder(false); // Hide the recorder interface
+    setIsPlaying(false);
 
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
 
-      // Stop streams and audio monitoring
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      stopAudioLevelMonitoring();
+    // Stop streams and audio monitoring
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    stopAudioLevelMonitoring();
+    
+    // Clear audio element
+    if (audioRef.current) {
+      audioRef.current.src = "";
     }
   };
 
@@ -471,7 +481,9 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             <div className="grid md:grid-cols-2 gap-8 items-start">
               {/* File Upload Area */}
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">Upload File</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
+                  Upload File
+                </h3>
                 <div
                   className="upload-area"
                   onDrop={handleDrop}
@@ -500,7 +512,9 @@ Your oral health is excellent! Keep up the great work with your daily dental car
 
               {/* Recording Section */}
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">Record Audio</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
+                  Record Audio
+                </h3>
                 <div className="bg-gray-50 rounded-lg p-6 min-h-[280px] flex items-center justify-center">
                   {!showRecorder && (
                     <div className="text-center">
@@ -733,8 +747,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 </div>
                 {output && (
                   <p className="text-xs text-gray-500 mb-4 text-center">
-                    💡 Click "Generate Another Note" to change these
-                    selections
+                    💡 Click "Generate Another Note" to change these selections
                   </p>
                 )}
 
