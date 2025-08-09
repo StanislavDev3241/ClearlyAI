@@ -7,6 +7,10 @@ import {
   Copy,
   Download,
   Menu,
+  Mic,
+  Square,
+  Play,
+  Pause,
 } from "lucide-react";
 
 interface OutputData {
@@ -28,7 +32,127 @@ function App() {
     soapNote: true,
     patientSummary: true,
   });
+  
+  // Recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showRecorder, setShowRecorder] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Recording functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      const chunks: BlobPart[] = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/wav' });
+        setRecordedBlob(blob);
+        
+        // Create audio URL for playback
+        const audioUrl = URL.createObjectURL(blob);
+        if (audioRef.current) {
+          audioRef.current.src = audioUrl;
+        }
+        
+        // Stop the stream
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      // Start timer
+      intervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (err) {
+      setError("Could not access microphone. Please allow microphone access.");
+      console.error("Error accessing microphone:", err);
+    }
+  };
+  
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+  };
+  
+  const playRecording = () => {
+    if (audioRef.current && recordedBlob) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  };
+  
+  const downloadRecording = () => {
+    if (recordedBlob) {
+      const url = URL.createObjectURL(recordedBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recording_${new Date().toISOString().split('T')[0]}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+  
+  const useRecording = () => {
+    if (recordedBlob) {
+      const file = new File([recordedBlob], `recording_${Date.now()}.wav`, {
+        type: 'audio/wav'
+      });
+      setFile(file);
+      setShowRecorder(false);
+      setError(null);
+    }
+  };
+  
+  const clearRecording = () => {
+    setRecordedBlob(null);
+    setRecordingTime(0);
+    setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.src = '';
+    }
+  };
+  
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleFileSelect = (selectedFile: File) => {
     // Check for text files or audio files
@@ -237,6 +361,120 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 </div>
               )}
             </div>
+            
+            {/* OR Divider */}
+            <div className="flex items-center my-6">
+              <div className="flex-1 border-t border-gray-300"></div>
+              <span className="px-4 text-sm text-gray-500">OR</span>
+              <div className="flex-1 border-t border-gray-300"></div>
+            </div>
+            
+            {/* Record Audio Button */}
+            <div className="text-center mb-6">
+              <button
+                onClick={() => setShowRecorder(!showRecorder)}
+                className="btn-secondary inline-flex items-center"
+                disabled={isUploading || !!output}
+              >
+                <Mic className="h-5 w-5 mr-2" />
+                Record Audio
+              </button>
+            </div>
+            
+            {/* Recording Interface */}
+            {showRecorder && (
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <div className="text-center">
+                  {!isRecording && !recordedBlob && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Click the microphone to start recording
+                      </p>
+                      <button
+                        onClick={startRecording}
+                        className="btn-primary inline-flex items-center"
+                      >
+                        <Mic className="h-5 w-5 mr-2" />
+                        Start Recording
+                      </button>
+                    </div>
+                  )}
+                  
+                  {isRecording && (
+                    <div>
+                      <div className="mb-4">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-3">
+                          <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+                        </div>
+                        <p className="text-lg font-medium text-gray-700">
+                          Recording... {formatTime(recordingTime)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={stopRecording}
+                        className="bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-6 rounded-lg inline-flex items-center"
+                      >
+                        <Square className="h-5 w-5 mr-2" />
+                        Stop Recording
+                      </button>
+                    </div>
+                  )}
+                  
+                  {recordedBlob && !isRecording && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Recording completed ({formatTime(recordingTime)})
+                      </p>
+                      
+                      <div className="flex justify-center space-x-3 mb-4">
+                        <button
+                          onClick={playRecording}
+                          className="btn-secondary inline-flex items-center"
+                        >
+                          {isPlaying ? (
+                            <Pause className="h-4 w-4 mr-1" />
+                          ) : (
+                            <Play className="h-4 w-4 mr-1" />
+                          )}
+                          {isPlaying ? 'Pause' : 'Play'}
+                        </button>
+                        
+                        <button
+                          onClick={downloadRecording}
+                          className="btn-secondary inline-flex items-center"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </button>
+                      </div>
+                      
+                      <div className="flex justify-center space-x-3">
+                        <button
+                          onClick={useRecording}
+                          className="btn-primary"
+                        >
+                          Use This Recording
+                        </button>
+                        
+                        <button
+                          onClick={clearRecording}
+                          className="btn-secondary"
+                        >
+                          Record Again
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Hidden audio element for playback */}
+                <audio
+                  ref={audioRef}
+                  onEnded={() => setIsPlaying(false)}
+                  style={{ display: 'none' }}
+                />
+              </div>
+            )}
 
             <input
               ref={fileInputRef}
@@ -425,8 +663,17 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       soapNote: true,
                       patientSummary: true,
                     });
+                    // Reset recording states
+                    setShowRecorder(false);
+                    setRecordedBlob(null);
+                    setRecordingTime(0);
+                    setIsPlaying(false);
+                    setIsRecording(false);
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
+                    }
+                    if (audioRef.current) {
+                      audioRef.current.src = '';
                     }
                   }}
                   className="btn-secondary"
