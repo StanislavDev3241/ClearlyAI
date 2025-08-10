@@ -497,20 +497,13 @@ function App() {
         "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
       const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
 
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
       const response = await fetch(webhookUrl, {
         method: "POST",
         headers: {
           "x-make-apikey": apiKey,
         },
         body: formData,
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -583,11 +576,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
     } catch (err) {
       console.error("Error uploading file:", err);
       if (err instanceof Error) {
-        if (err.name === "AbortError") {
-          setError("Request timed out. Please try again.");
-        } else {
-          setError(`Failed to process file: ${err.message}`);
-        }
+        setError(`Failed to process file: ${err.message}`);
       } else {
         setError("Failed to process file. Please try again.");
       }
