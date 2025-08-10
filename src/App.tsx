@@ -1127,14 +1127,22 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       Notes generated successfully! 🎉
                     </p>
                     <p className="text-xs text-green-600 mt-1">
-                      Your SOAP note and patient summary are ready below.
+                      {outputSelection.soapNote && outputSelection.patientSummary
+                        ? "Your SOAP note and patient summary are ready below."
+                        : outputSelection.soapNote
+                        ? "Your SOAP note is ready below."
+                        : "Your patient summary is ready below."}
                     </p>
                   </div>
                 </div>
               </div>
 
               <h2 className="text-3xl font-bold text-clearly-blue text-center mb-8">
-                Your Generated Notes
+                {outputSelection.soapNote && outputSelection.patientSummary
+                  ? "Your Generated Notes"
+                  : outputSelection.soapNote
+                  ? "Your Generated SOAP Note"
+                  : "Your Generated Patient Summary"}
               </h2>
               <div
                 className={`grid gap-8 ${
