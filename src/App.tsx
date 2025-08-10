@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Upload,
   FileText,
@@ -42,7 +42,10 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const isCancellingRef = useRef(false);
+  const isRecordingRef = useRef(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -52,6 +55,32 @@ function App() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
+
+  // Cleanup function to prevent memory leaks
+  const cleanup = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    analyserRef.current = null;
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return cleanup;
+  }, [cleanup]);
 
   // Log state changes for debugging
   useEffect(() => {
@@ -63,6 +92,9 @@ function App() {
       recordingTime,
       isPlaying,
       isCancelling: isCancellingRef.current,
+      hasFile: !!file,
+      hasOutput: !!output,
+      isProcessing,
     });
   }, [
     showRecorder,
@@ -71,46 +103,64 @@ function App() {
     recordedBlob,
     recordingTime,
     isPlaying,
+    file,
+    output,
+    isProcessing,
   ]);
 
-  // Audio level monitoring
-  const startAudioLevelMonitoring = (stream: MediaStream) => {
-    const audioContext = new (window.AudioContext ||
-      (window as any).webkitAudioContext)();
-    const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
+  // Reset recording interface when file is selected
+  useEffect(() => {
+    if (file && showRecorder) {
+      console.log("📁 File selected, hiding recording interface");
+      setShowRecorder(false);
+      clearRecording();
+    }
+  }, [file]);
 
-    analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.3;
-    source.connect(analyser);
+  // Audio level monitoring with real-time data
+  const startAudioLevelMonitoring = useCallback((stream: MediaStream) => {
+    try {
+      const audioContext = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
 
-    audioContextRef.current = audioContext;
-    analyserRef.current = analyser;
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
 
-    const updateAudioLevel = () => {
-      if (!analyser) return;
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteTimeDomainData(dataArray); // Use time domain for better voice detection
+      const updateAudioLevel = () => {
+        if (!analyser || !isRecordingRef.current) return;
 
-      // Calculate RMS (Root Mean Square) for better audio level detection
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const amplitude = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
-        sum += amplitude * amplitude;
-      }
-      const rms = Math.sqrt(sum / dataArray.length);
-      const normalizedLevel = Math.min(rms * 3, 1); // Amplify sensitivity
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteTimeDomainData(dataArray);
 
-      setAudioLevel(normalizedLevel);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const amplitude = (dataArray[i] - 128) / 128;
+          sum += amplitude * amplitude;
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const normalizedLevel = Math.min(rms * 3, 1);
 
-      animationRef.current = requestAnimationFrame(updateAudioLevel);
-    };
+        setAudioLevel(normalizedLevel);
 
-    updateAudioLevel();
-  };
+        if (isRecordingRef.current) {
+          animationRef.current = requestAnimationFrame(updateAudioLevel);
+        }
+      };
 
-  const stopAudioLevelMonitoring = () => {
+      updateAudioLevel();
+    } catch (error) {
+      console.error("Error starting audio level monitoring:", error);
+      setAudioLevel(0);
+    }
+  }, []);
+
+  const stopAudioLevelMonitoring = useCallback(() => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
@@ -121,31 +171,29 @@ function App() {
     }
     analyserRef.current = null;
     setAudioLevel(0);
-  };
+  }, []);
 
   // Recording functions
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     console.log("🎯 startRecording() called");
-    console.log(
-      "  - Current state: showRecorder=",
-      showRecorder,
-      "isRecording=",
-      isRecording,
-      "recordedBlob=",
-      !!recordedBlob
-    );
+
+    if (isRecordingRef.current) {
+      console.log("  ⚠️ Already recording, ignoring call");
+      return;
+    }
 
     try {
+      setIsProcessing(true);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log("  ✅ Microphone access granted");
 
       streamRef.current = stream;
+      isRecordingRef.current = true;
 
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       console.log("  📹 MediaRecorder created");
 
-      // Start audio level monitoring
       startAudioLevelMonitoring(stream);
 
       const chunks: BlobPart[] = [];
@@ -161,7 +209,7 @@ function App() {
           "  📹 MediaRecorder onstop triggered, isCancelling=",
           isCancellingRef.current
         );
-        // Only create blob if not cancelling
+
         if (!isCancellingRef.current) {
           const blob = new Blob(chunks, { type: "audio/wav" });
           console.log(
@@ -170,7 +218,6 @@ function App() {
           );
           setRecordedBlob(blob);
 
-          // Create audio URL for playback
           const audioUrl = URL.createObjectURL(blob);
           if (audioRef.current) {
             audioRef.current.src = audioUrl;
@@ -181,23 +228,21 @@ function App() {
 
         // Stop the stream
         stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
 
-        // Reset cancelling flag after onstop is complete
-        if (isCancellingRef.current) {
-          setTimeout(() => {
-            isCancellingRef.current = false;
-            console.log("  🔄 isCancelling reset to false (after onstop)");
-          }, 100);
-        }
+        // Reset cancelling flag immediately
+        isCancellingRef.current = false;
+        isRecordingRef.current = false;
+        console.log("  🔄 isCancelling and isRecording reset to false");
       };
 
       mediaRecorder.start();
       console.log("  ▶️ MediaRecorder started");
 
       setIsRecording(true);
+      setIsPaused(false);
       setRecordingTime(0);
 
-      // Start timer
       intervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
@@ -208,18 +253,13 @@ function App() {
     } catch (err) {
       setError("Could not access microphone. Please allow microphone access.");
       console.error("❌ Error accessing microphone:", err);
+    } finally {
+      setIsProcessing(false);
     }
-  };
+  }, [startAudioLevelMonitoring]);
 
-  const pauseRecording = () => {
+  const pauseRecording = useCallback(() => {
     console.log("⏸️ pauseRecording() called");
-    console.log(
-      "  - Current state: isRecording=",
-      isRecording,
-      "isPaused=",
-      isPaused
-    );
-
     if (mediaRecorderRef.current && isRecording && !isPaused) {
       mediaRecorderRef.current.pause();
       setIsPaused(true);
@@ -227,103 +267,70 @@ function App() {
 
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
       stopAudioLevelMonitoring();
-    } else {
-      console.log("  ❌ Cannot pause - conditions not met");
     }
-  };
+  }, [isRecording, isPaused, stopAudioLevelMonitoring]);
 
-  const resumeRecording = () => {
+  const resumeRecording = useCallback(() => {
     console.log("▶️ resumeRecording() called");
-    console.log(
-      "  - Current state: isRecording=",
-      isRecording,
-      "isPaused=",
-      isPaused
-    );
-
     if (mediaRecorderRef.current && isRecording && isPaused) {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
       console.log("  ✅ Recording resumed, isPaused=false");
 
-      // Restart timer
       intervalRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
 
-      // Restart audio monitoring
       if (streamRef.current) {
         startAudioLevelMonitoring(streamRef.current);
       }
-    } else {
-      console.log("  ❌ Cannot resume - conditions not met");
     }
-  };
+  }, [isRecording, isPaused, startAudioLevelMonitoring]);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     console.log("⏹️ stopRecording() called");
-    console.log(
-      "  - Current state: isRecording=",
-      isRecording,
-      "isPaused=",
-      isPaused
-    );
-
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setIsPaused(false);
-      console.log("  ✅ Recording stopped, isRecording=false, isPaused=false");
+      console.log("  ✅ Recording stopped");
 
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-
-      // Stop audio level monitoring
       stopAudioLevelMonitoring();
-    } else {
-      console.log("  ❌ Cannot stop - conditions not met");
     }
-  };
+  }, [isRecording, isPaused, stopAudioLevelMonitoring]);
 
-  const cancelRecording = () => {
+  const cancelRecording = useCallback(() => {
     console.log("❌ cancelRecording() called");
-    console.log(
-      "  - Current state: isRecording=",
-      isRecording,
-      "isPaused=",
-      isPaused,
-      "recordedBlob=",
-      !!recordedBlob
-    );
 
-    // Set cancelling flag before stopping
     isCancellingRef.current = true;
-    console.log("  🚫 Setting isCancelling=true");
+    isRecordingRef.current = false;
+    console.log("  🚫 Setting isCancelling=true, isRecording=false");
 
     if (mediaRecorderRef.current && (isRecording || isPaused)) {
       mediaRecorderRef.current.stop();
       console.log("  📹 MediaRecorder.stop() called");
     }
 
-    // Reset all recording states completely
+    // Reset all recording states
     setIsRecording(false);
     setIsPaused(false);
     setRecordingTime(0);
     setRecordedBlob(null);
-    // Don't hide recorder interface - stay in recording state like Record Again
     setIsPlaying(false);
-    console.log(
-      "  ✅ Recording states reset: isRecording=false, isPaused=false, recordingTime=0, recordedBlob=null"
-    );
+    console.log("  ✅ Recording states reset");
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
 
-    // Stop streams and audio monitoring
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -331,128 +338,157 @@ function App() {
     }
     stopAudioLevelMonitoring();
 
-    // Clear audio element
     if (audioRef.current) {
       audioRef.current.src = "";
     }
+  }, [isRecording, isPaused, stopAudioLevelMonitoring]);
 
-    // Note: isCancelling flag will be reset in MediaRecorder.onstop event
-  };
-
-  const playRecording = () => {
+  const playRecording = useCallback(() => {
     if (audioRef.current && recordedBlob) {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        audioRef.current.play().catch((error) => {
+          console.error("Error playing audio:", error);
+          setError("Failed to play audio recording");
+        });
         setIsPlaying(true);
       }
     }
-  };
+  }, [recordedBlob, isPlaying]);
 
-  const generateRecordingFilename = () => {
+  const generateRecordingFilename = useCallback(() => {
     const now = new Date();
-    const date = now.toISOString().split("T")[0]; // YYYY-MM-DD
-    const time = now.toTimeString().split(" ")[0].replace(/:/g, "-"); // HH-MM-SS
+    const date = now.toISOString().split("T")[0];
+    const time = now.toTimeString().split(" ")[0].replace(/:/g, "-");
     return `recording_${date}_${time}.wav`;
-  };
+  }, []);
 
-  const downloadRecording = () => {
+  const downloadRecording = useCallback(() => {
     if (recordedBlob) {
-      const url = URL.createObjectURL(recordedBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = generateRecordingFilename();
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      try {
+        const url = URL.createObjectURL(recordedBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = generateRecordingFilename();
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error downloading recording:", error);
+        setError("Failed to download recording");
+      }
     }
-  };
+  }, [recordedBlob, generateRecordingFilename]);
 
-  const useRecording = () => {
+  const useRecording = useCallback(() => {
     if (recordedBlob) {
-      const file = new File([recordedBlob], generateRecordingFilename(), {
-        type: "audio/wav",
-      });
-      setFile(file);
-      setShowRecorder(false);
-      setError(null);
+      try {
+        const file = new File([recordedBlob], generateRecordingFilename(), {
+          type: "audio/wav",
+        });
+        setFile(file);
+        setShowRecorder(false);
+        setError(null);
+        console.log(
+          "  ✅ Recording converted to file, recording interface hidden"
+        );
+      } catch (error) {
+        console.error("Error converting recording to file:", error);
+        setError("Failed to convert recording to file");
+      }
     }
-  };
+  }, [recordedBlob, generateRecordingFilename]);
 
-  const clearRecording = () => {
+  const clearRecording = useCallback(() => {
     console.log("🔄 clearRecording() called");
-    console.log(
-      "  - Current state: recordedBlob=",
-      !!recordedBlob,
-      "isPlaying=",
-      isPlaying,
-      "recordingTime=",
-      recordingTime
-    );
 
     setRecordedBlob(null);
     setRecordingTime(0);
     setIsPlaying(false);
     setIsPaused(false);
     isCancellingRef.current = false;
+    isRecordingRef.current = false;
     stopAudioLevelMonitoring();
+
     if (audioRef.current) {
       audioRef.current.src = "";
     }
 
     console.log("  ✅ All recording states cleared");
-  };
+  }, [stopAudioLevelMonitoring]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
-  };
+  }, []);
 
-  const handleFileSelect = (selectedFile: File) => {
-    // Check for text files or audio files
-    const isTextFile =
-      selectedFile.type === "text/plain" || selectedFile.name.endsWith(".txt");
-    const isAudioFile =
-      selectedFile.type.startsWith("audio/") ||
-      selectedFile.name.endsWith(".mp3") ||
-      selectedFile.name.endsWith(".m4a") ||
-      selectedFile.name.endsWith(".wav");
+  const handleFileSelect = useCallback((selectedFile: File) => {
+    try {
+      // Check file size (50MB limit)
+      const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+      if (selectedFile.size > maxSize) {
+        setError(
+          "File size too large. Please select a file smaller than 50MB."
+        );
+        setFile(null);
+        return;
+      }
 
-    if (isTextFile || isAudioFile) {
-      setFile(selectedFile);
-      setError(null);
-    } else {
-      setError("Please select a .txt file or audio file (.mp3, .m4a, .wav)");
-      setFile(null);
+      const isTextFile =
+        selectedFile.type === "text/plain" ||
+        selectedFile.name.endsWith(".txt");
+      const isAudioFile =
+        selectedFile.type.startsWith("audio/") ||
+        selectedFile.name.endsWith(".mp3") ||
+        selectedFile.name.endsWith(".m4a") ||
+        selectedFile.name.endsWith(".wav");
+
+      if (isTextFile || isAudioFile) {
+        setFile(selectedFile);
+        setError(null);
+        console.log(
+          "  ✅ File selected:",
+          selectedFile.name,
+          `(${(selectedFile.size / 1024 / 1024).toFixed(2)}MB)`
+        );
+      } else {
+        setError("Please select a .txt file or audio file (.mp3, .m4a, .wav)");
+        setFile(null);
+      }
+    } catch (error) {
+      console.error("Error handling file selection:", error);
+      setError("Failed to process selected file");
     }
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile) {
+        handleFileSelect(droppedFile);
+      }
+    },
+    [handleFileSelect]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      handleFileSelect(droppedFile);
-    }
-  };
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleUpload = async () => {
+  const handleUpload = useCallback(async () => {
     if (!file) return;
 
     setIsUploading(true);
     setError(null);
 
     try {
-      // Send file to Make.com webhook
       const formData = new FormData();
       formData.append("file", file);
 
@@ -461,19 +497,25 @@ function App() {
         "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
       const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
 
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(webhookUrl, {
         method: "POST",
         headers: {
           "x-make-apikey": apiKey,
         },
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Check if response is JSON
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const textResponse = await response.text();
@@ -484,20 +526,17 @@ function App() {
 
       const result = await response.json();
 
-      // Handle the response from Make.com
       if (result.soap_note_text && result.patient_summary_text) {
         setOutput({
           soapNote: result.soap_note_text,
           patientSummary: result.patient_summary_text,
         });
       } else if (result.soapNote && result.patientSummary) {
-        // Fallback for old format
         setOutput({
           soapNote: result.soapNote,
           patientSummary: result.patientSummary,
         });
       } else {
-        // Fallback to mock response if the webhook doesn't return expected format
         const mockResponse: OutputData = {
           soapNote: `SOAP Note - ${file.name}
 
@@ -543,37 +582,118 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       }
     } catch (err) {
       console.error("Error uploading file:", err);
-      setError("Failed to process file. Please try again.");
+      if (err instanceof Error) {
+        if (err.name === "AbortError") {
+          setError("Request timed out. Please try again.");
+        } else {
+          setError(`Failed to process file: ${err.message}`);
+        }
+      } else {
+        setError("Failed to process file. Please try again.");
+      }
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [file]);
 
-  const copyToClipboard = (text: string, _type: string) => {
-    navigator.clipboard.writeText(text);
-    // You could add a toast notification here
-  };
+  const copyToClipboard = useCallback(async (text: string, _type: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      console.error("Error copying to clipboard:", error);
+      setError("Failed to copy to clipboard");
+    }
+  }, []);
 
-  const downloadFile = (content: string, type: string) => {
-    // Get the original filename without extension
-    const originalName = file
-      ? file.name.replace(/\.[^/.]+$/, "")
-      : "patient-visit";
+  const downloadFile = useCallback(
+    (content: string, type: string) => {
+      try {
+        const originalName = file
+          ? file.name.replace(/\.[^/.]+$/, "")
+          : "patient-visit";
 
-    // Create descriptive filename based on type and original file
-    const timestamp = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-    const filename = `${originalName}_${type}_${timestamp}.txt`;
+        const timestamp = new Date().toISOString().split("T")[0];
+        const filename = `${originalName}_${type}_${timestamp}.txt`;
 
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error downloading file:", error);
+        setError("Failed to download file");
+      }
+    },
+    [file]
+  );
+
+  const resetAllStates = useCallback(() => {
+    // Confirm before resetting if there's output
+    if (
+      output &&
+      !window.confirm(
+        "Are you sure you want to clear all generated notes? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    console.log("🔄 Reset All States - clearing everything");
+
+    // Reset file states
+    setFile(null);
+    setOutput(null);
+    setError(null);
+    setOutputSelection({
+      soapNote: true,
+      patientSummary: true,
+    });
+
+    // Reset recording states
+    setShowRecorder(false);
+    setRecordedBlob(null);
+    setRecordingTime(0);
+    setIsPlaying(false);
+    setIsRecording(false);
+    setIsPaused(false);
+    setIsProcessing(false);
+    isCancellingRef.current = false;
+    isRecordingRef.current = false;
+
+    // Clear refs
+    stopAudioLevelMonitoring();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    if (audioRef.current) {
+      audioRef.current.src = "";
+    }
+
+    console.log("  ✅ All states reset to initial values");
+  }, [output, stopAudioLevelMonitoring]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl+R to reset
+      if ((event.ctrlKey || event.metaKey) && event.key === "r") {
+        event.preventDefault();
+        resetAllStates();
+      }
+      // Escape to close error messages
+      if (event.key === "Escape" && error) {
+        setError(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [resetAllStates, error]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -618,29 +738,58 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   }`}
                   onDrop={!!output ? undefined : handleDrop}
                   onDragOver={!!output ? undefined : handleDragOver}
-                  onClick={!!output ? undefined : () => fileInputRef.current?.click()}
+                  onClick={
+                    !!output ? undefined : () => fileInputRef.current?.click()
+                  }
                 >
-                  <Upload className={`h-12 w-12 mx-auto mb-4 ${
-                    !!output ? "text-gray-300" : "text-gray-400"
-                  }`} />
-                  <p className={`text-lg font-medium mb-2 ${
-                    !!output ? "text-gray-400" : "text-gray-700"
-                  }`}>
-                    {!!output ? "Upload disabled - Generate notes first" : "Upload transcript or audio recording"}
+                  <Upload
+                    className={`h-12 w-12 mx-auto mb-4 ${
+                      !!output ? "text-gray-300" : "text-gray-400"
+                    }`}
+                  />
+                  <p
+                    className={`text-lg font-medium mb-2 ${
+                      !!output ? "text-gray-400" : "text-gray-700"
+                    }`}
+                  >
+                    {!!output
+                      ? "Upload disabled - Generate notes first"
+                      : "Upload transcript or audio recording"}
                   </p>
-                  <p className={`text-sm ${
-                    !!output ? "text-gray-300" : "text-gray-500"
-                  }`}>
-                    {!!output ? "Complete current generation to upload new files" : "Drag and drop your file here, or click to browse"}
+                  <p
+                    className={`text-sm ${
+                      !!output ? "text-gray-300" : "text-gray-500"
+                    }`}
+                  >
+                    {!!output
+                      ? "Complete current generation to upload new files"
+                      : "Drag and drop your file here, or click to browse"}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     Supported: .txt, .mp3, .m4a, .wav
                   </p>
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                      <p className="text-sm text-green-700">
-                        Selected: {file.name}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-700">
+                            Selected: {file.name}
+                          </p>
+                          <p className="text-xs text-green-600 mt-1">
+                            Size: {(file.size / 1024 / 1024).toFixed(2)}MB •
+                            Type: {file.type || "Unknown"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setFile(null);
+                            setError(null);
+                          }}
+                          className="text-green-600 hover:text-green-800"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -662,17 +811,16 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           console.log(
                             "🖱️ Initial Start Recording button clicked"
                           );
-                          console.log(
-                            "  - Setting showRecorder=true, then calling startRecording after 100ms"
-                          );
                           setShowRecorder(true);
                           setTimeout(startRecording, 100);
                         }}
                         className="btn-primary inline-flex items-center"
-                        disabled={isUploading || !!output}
+                        disabled={
+                          isUploading || !!output || !!file || isProcessing
+                        }
                       >
                         <Mic className="h-5 w-5 mr-2" />
-                        Start Recording
+                        {isProcessing ? "Initializing..." : "Start Recording"}
                       </button>
                     </div>
                   )}
@@ -686,14 +834,15 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       <button
                         onClick={() => {
                           console.log(
-                            "🖱️ Secondary Start Recording button clicked (in recording interface)"
+                            "🖱️ Secondary Start Recording button clicked"
                           );
                           startRecording();
                         }}
                         className="btn-primary inline-flex items-center"
+                        disabled={isProcessing}
                       >
                         <Mic className="h-5 w-5 mr-2" />
-                        Start Recording
+                        {isProcessing ? "Initializing..." : "Start Recording"}
                       </button>
                     </div>
                   )}
@@ -710,32 +859,30 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           className="flex items-end justify-center space-x-1 mb-3"
                           style={{ height: "24px" }}
                         >
-                          {[0.3, 0.7, 0.5, 1.0, 0.8, 1.2, 0.6, 0.9, 0.4].map(
-                            (multiplier, index) => {
-                              const baseHeight = 3;
-                              const maxHeight = 20;
-                              const height = Math.max(
-                                baseHeight,
-                                Math.min(
-                                  maxHeight,
-                                  baseHeight +
-                                    audioLevel * maxHeight * multiplier
-                                )
-                              );
-                              const opacity = audioLevel > 0.01 ? 1 : 0.2;
+                          {Array.from({ length: 9 }, (_, index) => {
+                            const baseHeight = 3;
+                            const maxHeight = 20;
+                            const height = Math.max(
+                              baseHeight,
+                              Math.min(
+                                maxHeight,
+                                baseHeight +
+                                  audioLevel * maxHeight * (0.3 + index * 0.1)
+                              )
+                            );
+                            const opacity = audioLevel > 0.01 ? 1 : 0.2;
 
-                              return (
-                                <div
-                                  key={index}
-                                  className="w-1 bg-red-500 rounded-full transition-all duration-75 ease-out"
-                                  style={{
-                                    height: `${height}px`,
-                                    opacity: opacity,
-                                  }}
-                                ></div>
-                              );
-                            }
-                          )}
+                            return (
+                              <div
+                                key={index}
+                                className="w-1 bg-red-500 rounded-full transition-all duration-75 ease-out"
+                                style={{
+                                  height: `${height}px`,
+                                  opacity: opacity,
+                                }}
+                              ></div>
+                            );
+                          })}
                         </div>
 
                         <p className="text-base font-medium text-gray-700">
@@ -873,12 +1020,12 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           soapNote: e.target.checked,
                         }))
                       }
-                      disabled={!!output || isUploading}
+                      disabled={!!output || isUploading || isProcessing}
                       className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <span
                       className={`text-sm font-medium ${
-                        output || isUploading
+                        output || isUploading || isProcessing
                           ? "text-gray-500"
                           : "text-gray-700"
                       }`}
@@ -896,12 +1043,12 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                           patientSummary: e.target.checked,
                         }))
                       }
-                      disabled={!!output || isUploading}
+                      disabled={!!output || isUploading || isProcessing}
                       className="mr-3 h-4 w-4 text-clearly-blue border-gray-300 rounded focus:ring-clearly-blue disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <span
                       className={`text-sm font-medium ${
-                        output || isUploading
+                        output || isUploading || isProcessing
                           ? "text-gray-500"
                           : "text-gray-700"
                       }`}
@@ -922,12 +1069,20 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   disabled={
                     !file ||
                     isUploading ||
+                    isProcessing ||
                     (!outputSelection.soapNote &&
                       !outputSelection.patientSummary)
                   }
                   className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isUploading ? "Generating Notes..." : "Generate Notes"}
+                  {isUploading || isProcessing ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating Notes...
+                    </div>
+                  ) : (
+                    "Generate Notes"
+                  )}
                 </button>
               </div>
             </div>
@@ -943,15 +1098,52 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 }
               }}
               className="hidden"
-              disabled={!!output}
+              disabled={!!output || isProcessing}
             />
 
-            {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <X className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                  <div className="ml-auto pl-3">
+                    <button
+                      onClick={() => setError(null)}
+                      className="inline-flex text-red-400 hover:text-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Output Section - Moved here */}
+          {/* Output Section */}
           {output && (
             <div className="max-w-4xl mx-auto mt-12">
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-5 h-5 bg-green-400 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-green-800">
+                      Notes generated successfully! 🎉
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Your SOAP note and patient summary are ready below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <h2 className="text-3xl font-bold text-clearly-blue text-center mb-8">
                 Your Generated Notes
               </h2>
@@ -1044,38 +1236,15 @@ Your oral health is excellent! Keep up the great work with your daily dental car
               {/* Reset Form Button */}
               <div className="text-center mt-8">
                 <button
-                  onClick={() => {
-                    console.log(
-                      "🔄 Generate Another Note button clicked - resetting everything"
-                    );
-                    setFile(null);
-                    setOutput(null);
-                    setError(null);
-                    setOutputSelection({
-                      soapNote: true,
-                      patientSummary: true,
-                    });
-                    // Reset recording states
-                    setShowRecorder(false);
-                    setRecordedBlob(null);
-                    setRecordingTime(0);
-                    setIsPlaying(false);
-                    setIsRecording(false);
-                    setIsPaused(false);
-                    isCancellingRef.current = false;
-                    stopAudioLevelMonitoring();
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = "";
-                    }
-                    if (audioRef.current) {
-                      audioRef.current.src = "";
-                    }
-                    console.log("  ✅ All states reset to initial values");
-                  }}
+                  onClick={resetAllStates}
                   className="btn-secondary"
+                  title="Clear all data and start over (Ctrl+R)"
                 >
                   Generate Another Note
                 </button>
+                <p className="text-xs text-gray-500 mt-2">
+                  Press Ctrl+R to quickly reset
+                </p>
               </div>
             </div>
           )}
@@ -1131,7 +1300,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
               <div className="bg-clearly-light-blue rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                 <Monitor className="h-8 w-8 text-white" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
                 Review/Save
               </h3>
               <p className="text-gray-600">
@@ -1182,7 +1351,6 @@ Your oral health is excellent! Keep up the great work with your daily dental car
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <button
             onClick={() => {
-              // Scroll to the upload section
               document.querySelector(".upload-area")?.scrollIntoView({
                 behavior: "smooth",
               });
