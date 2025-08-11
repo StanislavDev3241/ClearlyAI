@@ -45,6 +45,8 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState<
     "idle" | "uploading" | "processing" | "complete" | "error"
   >("idle");
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [remainingTime, setRemainingTime] = useState<number | null>(null);
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -440,6 +442,20 @@ function App() {
       .padStart(2, "0")}`;
   }, []);
 
+  const formatUploadTime = useCallback((seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    }
+  }, []);
+
   const handleFileSelect = useCallback((selectedFile: File) => {
     try {
       // Check file size (200MB limit - handles 1+ hour recordings)
@@ -501,6 +517,11 @@ function App() {
     setError(null);
     setUploadStatus("uploading");
     setUploadProgress(0);
+    
+    // Start upload timer
+    const startTime = Date.now();
+    setElapsedTime(0);
+    setRemainingTime(null);
 
     try {
       // Use CORS proxy to bypass CORS restrictions
@@ -553,11 +574,22 @@ function App() {
           result = await new Promise<any>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
-            // Real upload progress tracking
+            // Real upload progress tracking with time calculations
             xhr.upload.addEventListener("progress", (event) => {
               if (event.lengthComputable) {
                 const progress = (event.loaded / event.total) * 90; // Go to 90% during upload
                 setUploadProgress(progress);
+                
+                // Calculate elapsed and remaining time
+                const currentTime = Date.now();
+                const elapsed = Math.floor((currentTime - startTime) / 1000);
+                setElapsedTime(elapsed);
+                
+                if (progress > 0) {
+                  const estimatedTotalTime = (elapsed / progress) * 100;
+                  const remaining = Math.max(0, Math.floor(estimatedTotalTime - elapsed));
+                  setRemainingTime(remaining);
+                }
               }
             });
 
@@ -571,12 +603,14 @@ function App() {
                 } catch (error) {
                   reject(new Error("Invalid JSON response"));
                 }
-                              } else if (xhr.status === 413) {
-                  reject(
-                    new Error(
-                      `File too large (${(file.size / (1024 * 1024)).toFixed(1)}MB) for server. Try a smaller file or contact support.`
-                    )
-                  );
+              } else if (xhr.status === 413) {
+                reject(
+                  new Error(
+                    `File too large (${(file.size / (1024 * 1024)).toFixed(
+                      1
+                    )}MB) for server. Try a smaller file or contact support.`
+                  )
+                );
               } else {
                 reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
               }
@@ -707,6 +741,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       if (uploadStatus !== "complete") {
         setUploadProgress(0);
       }
+      
+      // Reset timer states
+      setElapsedTime(0);
+      setRemainingTime(null);
     }
   }, [file, uploadStatus]);
 
@@ -786,6 +824,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
     // Reset upload states
     setUploadProgress(0);
     setUploadStatus("idle");
+    setElapsedTime(0);
+    setRemainingTime(null);
 
     // Clear refs
     stopAudioLevelMonitoring();
@@ -1284,6 +1324,17 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>
+                    
+                    {/* Timer Display */}
+                    {uploadStatus === "uploading" && (
+                      <div className="flex justify-between text-xs text-gray-600 mt-2">
+                        <span>⏱️ Elapsed: {formatUploadTime(elapsedTime)}</span>
+                        {remainingTime !== null && (
+                          <span>⏳ Remaining: {formatUploadTime(remainingTime)}</span>
+                        )}
+                      </div>
+                    )}
+                    
                     <p className="text-xs text-gray-500 mt-1 text-center">
                       {uploadStatus === "uploading"
                         ? "Uploading file..."
