@@ -458,11 +458,11 @@ function App() {
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     try {
-      // Check file size (200MB limit - handles 1+ hour recordings)
-      const maxSize = 200 * 1024 * 1024; // 200MB in bytes
+      // Check file size (100MB limit - handles long medical recordings)
+      const maxSize = 100 * 1024 * 1024; // 100MB in bytes
       if (selectedFile.size > maxSize) {
         setError(
-          "File size too large. Please select a file smaller than 200MB."
+          "File size too large. Please select a file smaller than 100MB."
         );
         setFile(null);
         return;
@@ -928,9 +928,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       : "Drag and drop your file here, or click to browse"}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
+                    Supported: .txt, .mp3, .m4a, .wav (Max: 100MB)
                   </p>
-
 
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1288,7 +1287,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     </p>
                     {uploadStatus === "uploading" && file && (
                       <p className="text-xs text-blue-600 mt-1 text-center">
-                        ⏱️ Timeout: {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
+                        ⏱️ Timeout:{" "}
+                        {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
                       </p>
                     )}
                   </div>
