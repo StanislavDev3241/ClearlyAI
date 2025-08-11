@@ -36,7 +36,13 @@ function App() {
 
   // Add HIPAA compliance state
   const [showHipaDialog, setShowHipaDialog] = useState(false);
-  const [hipaaChoice, setHipaaChoice] = useState<"save" | "delete" | null>(null);
+  const [hipaaChoice, setHipaaChoice] = useState<"save" | "delete" | null>(
+    null
+  );
+
+  // Add upload progress tracking
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'complete' | 'error'>('idle');
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -434,11 +440,11 @@ function App() {
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     try {
-      // Check file size (50MB limit)
-      const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+      // Check file size (200MB limit - handles 1+ hour recordings)
+      const maxSize = 200 * 1024 * 1024; // 200MB in bytes
       if (selectedFile.size > maxSize) {
         setError(
-          "File size too large. Please select a file smaller than 50MB."
+          "File size too large. Please select a file smaller than 200MB."
         );
         setFile(null);
         return;
@@ -491,6 +497,8 @@ function App() {
 
     setIsUploading(true);
     setError(null);
+    setUploadStatus('uploading');
+    setUploadProgress(0);
 
     try {
       const formData = new FormData();
@@ -501,13 +509,37 @@ function App() {
         "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
       const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
 
+      // Add timeout handling based on file size
+      const timeoutDuration = file.size > 50 * 1024 * 1024 ? 300000 : 60000; // 5 min for large files, 1 min for small
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        setError("Upload timed out. Large files may take longer to process.");
+        setUploadStatus('error');
+        setIsUploading(false);
+      }, timeoutDuration);
+
+      // Simulate upload progress (since fetch doesn't support progress)
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) return prev; // Don't go to 100% until processing starts
+          return prev + Math.random() * 10;
+        });
+      }, 500);
+
       const response = await fetch(webhookUrl, {
         method: "POST",
         headers: {
           "x-make-apikey": apiKey,
         },
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+      clearInterval(progressInterval);
+      setUploadProgress(90); // Upload complete, now processing
+      setUploadStatus('processing');
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -528,6 +560,8 @@ function App() {
           soapNote: result.soap_note_text,
           patientSummary: result.patient_summary_text,
         });
+        setUploadProgress(100);
+        setUploadStatus('complete');
         // Trigger HIPAA compliance after successful generation
         setTimeout(() => handleHipaaCompliance(), 500);
       } else if (result.soapNote && result.patientSummary) {
@@ -535,6 +569,8 @@ function App() {
           soapNote: result.soapNote,
           patientSummary: result.patientSummary,
         });
+        setUploadProgress(100);
+        setUploadStatus('complete');
         // Trigger HIPAA compliance after successful generation
         setTimeout(() => handleHipaaCompliance(), 500);
       } else {
@@ -580,20 +616,30 @@ Next Steps:
 Your oral health is excellent! Keep up the great work with your daily dental care routine.`,
         };
         setOutput(mockResponse);
+        setUploadProgress(100);
+        setUploadStatus('complete');
         // Trigger HIPAA compliance after successful generation
         setTimeout(() => handleHipaaCompliance(), 500);
       }
     } catch (err) {
       console.error("Error uploading file:", err);
+      setUploadStatus('error');
       if (err instanceof Error) {
-        setError(`Failed to process file: ${err.message}`);
+        if (err.name === 'AbortError') {
+          setError("Upload timed out. Large files may take longer to process.");
+        } else {
+          setError(`Failed to process file: ${err.message}`);
+        }
       } else {
         setError("Failed to process file. Please try again.");
       }
     } finally {
       setIsUploading(false);
+      if (uploadStatus !== 'complete') {
+        setUploadProgress(0);
+      }
     }
-  }, [file]);
+  }, [file, uploadStatus]);
 
   const copyToClipboard = useCallback(async (text: string, _type: string) => {
     try {
@@ -667,6 +713,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
     // Reset HIPAA states
     setShowHipaDialog(false);
     setHipaaChoice(null);
+
+    // Reset upload states
+    setUploadProgress(0);
+    setUploadStatus('idle');
 
     // Clear refs
     stopAudioLevelMonitoring();
@@ -820,7 +870,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                       : "Drag and drop your file here, or click to browse"}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Supported: .txt, .mp3, .m4a, .wav
+                    Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
                   </p>
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1136,12 +1186,31 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   {isUploading || isProcessing ? (
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Generating Notes...
+                      {uploadStatus === 'uploading' ? 'Uploading...' : 'Processing...'}
                     </div>
                   ) : (
                     "Generate Notes"
                   )}
                 </button>
+
+                {/* Upload Progress Bar */}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Upload Progress</span>
+                      <span>{Math.round(uploadProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 text-center">
+                      {uploadStatus === 'uploading' ? 'Uploading file...' : 'Processing with AI...'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
