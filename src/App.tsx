@@ -24,10 +24,6 @@ interface OutputSelection {
   patientSummary: boolean;
 }
 
-// Add HIPAA compliance state
-const [showHipaDialog, setShowHipaDialog] = useState(false);
-const [hipaaChoice, setHipaaChoice] = useState<"save" | "delete" | null>(null);
-
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -37,6 +33,10 @@ function App() {
     soapNote: true,
     patientSummary: true,
   });
+
+  // Add HIPAA compliance state
+  const [showHipaDialog, setShowHipaDialog] = useState(false);
+  const [hipaaChoice, setHipaaChoice] = useState<"save" | "delete" | null>(null);
 
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
