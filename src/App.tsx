@@ -503,9 +503,22 @@ function App() {
     setUploadProgress(0);
 
     try {
-      const webhookUrl =
+      // Use CORS proxy to bypass CORS restrictions
+      const originalWebhookUrl =
         import.meta.env.VITE_MAKE_WEBHOOK_URL ||
         "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
+
+      // CORS proxy options (try multiple proxies for reliability)
+      const corsProxies = [
+        `https://cors-anywhere.herokuapp.com/${originalWebhookUrl}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(
+          originalWebhookUrl
+        )}`,
+        `https://cors.bridged.cc/${originalWebhookUrl}`,
+        originalWebhookUrl, // Fallback to direct if proxies fail
+      ];
+
+      let webhookUrl = corsProxies[0]; // Start with first proxy
       const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
 
       // Dynamic timeout: 1MB = 1 minute + 5% buffer for safety
@@ -513,7 +526,7 @@ function App() {
       const baseTimeoutMinutes = fileSizeMB;
       const bufferTime = baseTimeoutMinutes * 0.05; // 5% extra time
       const totalTimeoutMinutes = baseTimeoutMinutes + bufferTime;
-      const timeoutDuration = (totalTimeoutMinutes * 60 * 1000) + 10000; // Convert to milliseconds + 10 seconds extra
+      const timeoutDuration = totalTimeoutMinutes * 60 * 1000 + 10000; // Convert to milliseconds + 10 seconds extra
 
       // Log timeout calculation for debugging
       console.log(
@@ -524,52 +537,91 @@ function App() {
         )}min buffer + 10s extra = ${totalTimeoutMinutes.toFixed(1)}min total`
       );
 
-      // Use XMLHttpRequest for real upload progress tracking
-      const result = await new Promise<any>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
+      // Try multiple CORS proxies with retry mechanism
+      let lastError: Error | null = null;
+      let result: any = null;
 
-        // Real upload progress tracking
-        xhr.upload.addEventListener("progress", (event) => {
-          if (event.lengthComputable) {
-            const progress = (event.loaded / event.total) * 90; // Go to 90% during upload
-            setUploadProgress(progress);
+      for (let attempt = 0; attempt < corsProxies.length; attempt++) {
+        try {
+          webhookUrl = corsProxies[attempt];
+          console.log(
+            `🔄 Attempt ${attempt + 1}: Trying ${
+              webhookUrl.includes("cors") ? "CORS proxy" : "direct connection"
+            }`
+          );
+
+          result = await new Promise<any>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            // Real upload progress tracking
+            xhr.upload.addEventListener("progress", (event) => {
+              if (event.lengthComputable) {
+                const progress = (event.loaded / event.total) * 90; // Go to 90% during upload
+                setUploadProgress(progress);
+              }
+            });
+
+            xhr.addEventListener("load", () => {
+              if (xhr.status === 200) {
+                try {
+                  const result = JSON.parse(xhr.responseText);
+                  setUploadProgress(90); // Upload complete, now processing
+                  setUploadStatus("processing");
+                  resolve(result);
+                } catch (error) {
+                  reject(new Error("Invalid JSON response"));
+                }
+                              } else if (xhr.status === 413) {
+                  reject(
+                    new Error(
+                      `File too large (${(file.size / (1024 * 1024)).toFixed(1)}MB) for server. Try a smaller file or contact support.`
+                    )
+                  );
+              } else {
+                reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+              }
+            });
+
+            xhr.addEventListener("error", () =>
+              reject(new Error("Network error during upload"))
+            );
+            xhr.addEventListener("timeout", () =>
+              reject(
+                new Error(
+                  "Upload timed out. Large medical files may take longer to process. Try smaller files or check your connection."
+                )
+              )
+            );
+
+            xhr.open("POST", webhookUrl);
+            xhr.setRequestHeader("x-make-apikey", apiKey);
+            xhr.timeout = timeoutDuration;
+
+            const formData = new FormData();
+            formData.append("file", file);
+            xhr.send(formData);
+          });
+
+          // If we get here, the request was successful
+          return result;
+        } catch (error) {
+          lastError = error as Error;
+          console.log(`❌ Attempt ${attempt + 1} failed:`, error);
+
+          if (attempt < corsProxies.length - 1) {
+            console.log(`🔄 Retrying with next proxy...`);
+            setError(
+              `Connection failed, retrying... (${attempt + 1}/${
+                corsProxies.length
+              })`
+            );
+            await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
           }
-        });
+        }
+      }
 
-        xhr.addEventListener("load", () => {
-          if (xhr.status === 200) {
-            try {
-              const result = JSON.parse(xhr.responseText);
-              setUploadProgress(90); // Upload complete, now processing
-              setUploadStatus("processing");
-              resolve(result);
-            } catch (error) {
-              reject(new Error("Invalid JSON response"));
-            }
-          } else {
-            reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
-          }
-        });
-
-        xhr.addEventListener("error", () =>
-          reject(new Error("Network error during upload"))
-        );
-        xhr.addEventListener("timeout", () =>
-          reject(
-            new Error(
-              "Upload timed out. Large medical files may take longer to process. Try smaller files or check your connection."
-            )
-          )
-        );
-
-        xhr.open("POST", webhookUrl);
-        xhr.setRequestHeader("x-make-apikey", apiKey);
-        xhr.timeout = timeoutDuration;
-
-        const formData = new FormData();
-        formData.append("file", file);
-        xhr.send(formData);
-      });
+      // If all attempts failed, throw the last error
+      throw lastError || new Error("All connection attempts failed");
 
       // Process the result from XMLHttpRequest
       if (result.soap_note_text && result.patient_summary_text) {
@@ -592,7 +644,7 @@ function App() {
         setTimeout(() => handleHipaaCompliance(), 500);
       } else {
         const mockResponse: OutputData = {
-          soapNote: `SOAP Note - ${file.name}
+          soapNote: `SOAP Note - ${file?.name || "Unknown File"}
 
 SUBJECTIVE:
 Patient presents for routine dental examination and cleaning.
@@ -890,7 +942,11 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
                   </p>
                   <p className="text-xs text-blue-600 mt-1">
-                    ⏱️ Dynamic timeout: 1MB = 1 minute + 5% buffer + 10s extra for safety
+                    ⏱️ Dynamic timeout: 1MB = 1 minute + 5% buffer + 10s extra
+                    for safety
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    🔄 Auto-retry with CORS proxies for reliable connections
                   </p>
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1233,13 +1289,14 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         ? "Uploading file..."
                         : "Processing with AI..."}
                     </p>
-                                         {uploadStatus === "uploading" && file && (
-                       <p className="text-xs text-blue-600 mt-1 text-center">
-                         ⏱️ Timeout:{" "}
-                         {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes + 10s
-                         ({Math.round(file.size / (1024 * 1024))}MB + 5% buffer + 10s extra)
-                       </p>
-                     )}
+                    {uploadStatus === "uploading" && file && (
+                      <p className="text-xs text-blue-600 mt-1 text-center">
+                        ⏱️ Timeout:{" "}
+                        {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
+                        + 10s ({Math.round(file.size / (1024 * 1024))}MB + 5%
+                        buffer + 10s extra)
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
