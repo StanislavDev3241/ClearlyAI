@@ -513,10 +513,16 @@ function App() {
       const baseTimeoutMinutes = fileSizeMB;
       const bufferTime = baseTimeoutMinutes * 0.05; // 5% extra time
       const totalTimeoutMinutes = baseTimeoutMinutes + bufferTime;
-      const timeoutDuration = totalTimeoutMinutes * 60 * 1000; // Convert to milliseconds
-      
+      const timeoutDuration = (totalTimeoutMinutes * 60 * 1000) + 10000; // Convert to milliseconds + 10 seconds extra
+
       // Log timeout calculation for debugging
-      console.log(`📊 Timeout Calculation: ${fileSizeMB.toFixed(1)}MB = ${baseTimeoutMinutes.toFixed(1)}min + ${bufferTime.toFixed(1)}min buffer = ${totalTimeoutMinutes.toFixed(1)}min total`);
+      console.log(
+        `📊 Timeout Calculation: ${fileSizeMB.toFixed(
+          1
+        )}MB = ${baseTimeoutMinutes.toFixed(1)}min + ${bufferTime.toFixed(
+          1
+        )}min buffer + 10s extra = ${totalTimeoutMinutes.toFixed(1)}min total`
+      );
 
       // Use XMLHttpRequest for real upload progress tracking
       const result = await new Promise<any>((resolve, reject) => {
@@ -884,7 +890,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
                   </p>
                   <p className="text-xs text-blue-600 mt-1">
-                    ⏱️ Dynamic timeout: 1MB = 1 minute + 5% buffer for safety
+                    ⏱️ Dynamic timeout: 1MB = 1 minute + 5% buffer + 10s extra for safety
                   </p>
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1229,8 +1235,9 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     </p>
                                          {uploadStatus === "uploading" && file && (
                        <p className="text-xs text-blue-600 mt-1 text-center">
-                         ⏱️ Timeout: {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
-                         ({Math.round(file.size / (1024 * 1024))}MB + 5% buffer)
+                         ⏱️ Timeout:{" "}
+                         {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes + 10s
+                         ({Math.round(file.size / (1024 * 1024))}MB + 5% buffer + 10s extra)
                        </p>
                      )}
                   </div>
