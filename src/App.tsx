@@ -508,8 +508,15 @@ function App() {
         "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
       const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
 
-      // Increased timeout for medical files - 90 minutes for large files (6x increase)
-      const timeoutDuration = file.size > 50 * 1024 * 1024 ? 5400000 : 1800000; // 90 min vs 30 min
+      // Dynamic timeout: 1MB = 1 minute + 5% buffer for safety
+      const fileSizeMB = file.size / (1024 * 1024);
+      const baseTimeoutMinutes = fileSizeMB;
+      const bufferTime = baseTimeoutMinutes * 0.05; // 5% extra time
+      const totalTimeoutMinutes = baseTimeoutMinutes + bufferTime;
+      const timeoutDuration = totalTimeoutMinutes * 60 * 1000; // Convert to milliseconds
+      
+      // Log timeout calculation for debugging
+      console.log(`📊 Timeout Calculation: ${fileSizeMB.toFixed(1)}MB = ${baseTimeoutMinutes.toFixed(1)}min + ${bufferTime.toFixed(1)}min buffer = ${totalTimeoutMinutes.toFixed(1)}min total`);
 
       // Use XMLHttpRequest for real upload progress tracking
       const result = await new Promise<any>((resolve, reject) => {
@@ -877,8 +884,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
                   </p>
                   <p className="text-xs text-blue-600 mt-1">
-                    ⏱️ Large files (&gt;50MB) get 90-minute timeout for medical
-                    recordings
+                    ⏱️ Dynamic timeout: 1MB = 1 minute + 5% buffer for safety
                   </p>
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1221,15 +1227,12 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         ? "Uploading file..."
                         : "Processing with AI..."}
                     </p>
-                                          {uploadStatus === "uploading" && file && (
-                        <p className="text-xs text-blue-600 mt-1 text-center">
-                          ⏱️ Timeout:{" "}
-                          {file.size > 50 * 1024 * 1024
-                            ? "90 minutes"
-                            : "30 minutes"}{" "}
-                          for large files
-                        </p>
-                      )}
+                                         {uploadStatus === "uploading" && file && (
+                       <p className="text-xs text-blue-600 mt-1 text-center">
+                         ⏱️ Timeout: {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
+                         ({Math.round(file.size / (1024 * 1024))}MB + 5% buffer)
+                       </p>
+                     )}
                   </div>
                 )}
               </div>
