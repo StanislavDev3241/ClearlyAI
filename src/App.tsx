@@ -508,22 +508,22 @@ function App() {
         "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
       const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
 
-      // Increased timeout for medical files - 15 minutes for large files
-      const timeoutDuration = file.size > 50 * 1024 * 1024 ? 900000 : 300000; // 15 min vs 5 min
+      // Increased timeout for medical files - 90 minutes for large files (6x increase)
+      const timeoutDuration = file.size > 50 * 1024 * 1024 ? 5400000 : 1800000; // 90 min vs 30 min
 
       // Use XMLHttpRequest for real upload progress tracking
       const result = await new Promise<any>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        
+
         // Real upload progress tracking
-        xhr.upload.addEventListener('progress', (event) => {
+        xhr.upload.addEventListener("progress", (event) => {
           if (event.lengthComputable) {
             const progress = (event.loaded / event.total) * 90; // Go to 90% during upload
             setUploadProgress(progress);
           }
         });
 
-        xhr.addEventListener('load', () => {
+        xhr.addEventListener("load", () => {
           if (xhr.status === 200) {
             try {
               const result = JSON.parse(xhr.responseText);
@@ -531,20 +531,28 @@ function App() {
               setUploadStatus("processing");
               resolve(result);
             } catch (error) {
-              reject(new Error('Invalid JSON response'));
+              reject(new Error("Invalid JSON response"));
             }
           } else {
             reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
           }
         });
 
-        xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
-        xhr.addEventListener('timeout', () => reject(new Error('Upload timed out. Large medical files may take longer to process.')));
+        xhr.addEventListener("error", () =>
+          reject(new Error("Network error during upload"))
+        );
+        xhr.addEventListener("timeout", () =>
+          reject(
+            new Error(
+              "Upload timed out. Large medical files may take longer to process. Try smaller files or check your connection."
+            )
+          )
+        );
 
-        xhr.open('POST', webhookUrl);
-        xhr.setRequestHeader('x-make-apikey', apiKey);
+        xhr.open("POST", webhookUrl);
+        xhr.setRequestHeader("x-make-apikey", apiKey);
         xhr.timeout = timeoutDuration;
-        
+
         const formData = new FormData();
         formData.append("file", file);
         xhr.send(formData);
@@ -869,7 +877,8 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
                   </p>
                   <p className="text-xs text-blue-600 mt-1">
-                    ⏱️ Large files (&gt;50MB) get 15-minute timeout for medical recordings
+                    ⏱️ Large files (&gt;50MB) get 90-minute timeout for medical
+                    recordings
                   </p>
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1212,11 +1221,15 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                         ? "Uploading file..."
                         : "Processing with AI..."}
                     </p>
-                    {uploadStatus === "uploading" && file && (
-                      <p className="text-xs text-blue-600 mt-1 text-center">
-                        ⏱️ Timeout: {file.size > 50 * 1024 * 1024 ? "15 minutes" : "5 minutes"} for large files
-                      </p>
-                    )}
+                                          {uploadStatus === "uploading" && file && (
+                        <p className="text-xs text-blue-600 mt-1 text-center">
+                          ⏱️ Timeout:{" "}
+                          {file.size > 50 * 1024 * 1024
+                            ? "90 minutes"
+                            : "30 minutes"}{" "}
+                          for large files
+                        </p>
+                      )}
                   </div>
                 )}
               </div>
