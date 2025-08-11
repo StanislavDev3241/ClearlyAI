@@ -537,30 +537,21 @@ function App() {
       const totalTimeoutMinutes = baseTimeoutMinutes + bufferTime;
       const timeoutDuration = totalTimeoutMinutes * 60 * 1000 + 10000; // Convert to milliseconds + 10 seconds extra
 
-      // Log timeout calculation for debugging
-      console.log(
-        `📊 Timeout Calculation: ${fileSizeMB.toFixed(
-          1
-        )}MB = ${baseTimeoutMinutes.toFixed(1)}min + ${bufferTime.toFixed(
-          1
-        )}min buffer + 10s extra = ${totalTimeoutMinutes.toFixed(1)}min total`
-      );
-
       // Single upload attempt with XMLHttpRequest
       const result = await new Promise<any>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        
+
         // Real upload progress tracking with time calculations
         xhr.upload.addEventListener("progress", (event) => {
           if (event.lengthComputable) {
             const progress = (event.loaded / event.total) * 90; // Go to 90% during upload
             setUploadProgress(progress);
-            
+
             // Calculate elapsed and remaining time
             const currentTime = Date.now();
             const elapsed = Math.floor((currentTime - startTime) / 1000);
             setElapsedTime(elapsed);
-            
+
             if (progress > 0) {
               const estimatedTotalTime = (elapsed / progress) * 100;
               const remaining = Math.max(
@@ -609,7 +600,7 @@ function App() {
         xhr.open("POST", webhookUrl);
         xhr.setRequestHeader("x-make-apikey", apiKey);
         xhr.timeout = timeoutDuration;
-        
+
         const formData = new FormData();
         formData.append("file", file);
         xhr.send(formData);
@@ -939,10 +930,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   <p className="text-xs text-gray-400 mt-1">
                     Supported: .txt, .mp3, .m4a, .wav (Max: 200MB)
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    ⏱️ Dynamic timeout: 1MB = 1 minute + 5% buffer + 10s extra
-                    for safety
-                  </p>
+
 
                   {file && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
@@ -1300,10 +1288,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     </p>
                     {uploadStatus === "uploading" && file && (
                       <p className="text-xs text-blue-600 mt-1 text-center">
-                        ⏱️ Timeout:{" "}
-                        {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
-                        + 10s ({Math.round(file.size / (1024 * 1024))}MB + 5%
-                        buffer + 10s extra)
+                        ⏱️ Timeout: {Math.round((file.size / (1024 * 1024)) * 1.05)} minutes
                       </p>
                     )}
                   </div>
