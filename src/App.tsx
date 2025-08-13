@@ -26,7 +26,7 @@ interface OutputSelection {
 function App() {
   // API Configuration
   const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || "http://83.229.115.190:3001";
+    import.meta.env.VITE_API_BASE_URL || "https://83.229.115.190:3001";
   const API_ENDPOINTS = {
     login: `${API_BASE_URL}/api/auth/login`,
     upload: `${API_BASE_URL}/api/upload`,
@@ -117,45 +117,45 @@ function App() {
   const handleAdminLogin = async (email: string, password: string) => {
     try {
       const response = await fetch(API_ENDPOINTS.login, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('adminToken', data.token);
+        localStorage.setItem("adminToken", data.token);
         setIsAdmin(true);
         setIsLoggedIn(true);
         setShowLogin(false);
-        setSuccess('Admin login successful!');
+        setSuccess("Admin login successful!");
         fetchAllNotes(); // Fetch all notes for admin
       } else {
-        setError('Invalid admin credentials');
+        setError("Invalid admin credentials");
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError("Login failed. Please try again.");
     }
   };
 
   // Fetch all notes (admin only)
   const fetchAllNotes = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem("adminToken");
       const response = await fetch(`${API_BASE_URL}/api/admin/notes`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setAllNotes(data.notes || []);
       }
     } catch (err) {
-      console.error('Failed to fetch all notes:', err);
+      console.error("Failed to fetch all notes:", err);
     }
   };
 
@@ -168,22 +168,22 @@ function App() {
         setUserNotes(data.notes || []);
       }
     } catch (err) {
-      console.error('Failed to fetch user notes:', err);
+      console.error("Failed to fetch user notes:", err);
     }
   };
 
   // Admin logout
   const handleAdminLogout = () => {
-    localStorage.removeItem('adminToken');
+    localStorage.removeItem("adminToken");
     setIsAdmin(false);
     setIsLoggedIn(false);
     setAllNotes([]);
-    setSuccess('Admin logged out successfully');
+    setSuccess("Admin logged out successfully");
   };
 
   // Check if admin token exists on component mount
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = localStorage.getItem("adminToken");
     if (token) {
       setIsAdmin(true);
       setIsLoggedIn(true);
@@ -622,7 +622,7 @@ function App() {
     try {
       // Use custom server instead of Make.com directly
       const webhookUrl = API_ENDPOINTS.upload;
-      const apiKey = localStorage.getItem('adminToken'); // Use auth token if admin, otherwise null
+      const apiKey = localStorage.getItem("adminToken"); // Use auth token if admin, otherwise null
 
       // Dynamic timeout: 1MB = 1 minute + 5% buffer for safety
       const fileSizeMB = file.size / (1024 * 1024);
@@ -993,7 +993,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                     onClick={() => setShowAllNotes(!showAllNotes)}
                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
                   >
-                    {showAllNotes ? 'Show My Notes' : 'Show All Notes (Admin)'}
+                    {showAllNotes ? "Show My Notes" : "Show All Notes (Admin)"}
                   </button>
                 )}
                 <div className="text-right">
@@ -1670,18 +1670,18 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       <section className="bg-white py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-clearly-blue text-center mb-8">
-            {isAdmin && showAllNotes ? 'All Notes (Admin View)' : 'My Notes'}
+            {isAdmin && showAllNotes ? "All Notes (Admin View)" : "My Notes"}
           </h2>
-          
+
           {isAdmin && showAllNotes ? (
-            <NotesList 
-              notes={allNotes} 
+            <NotesList
+              notes={allNotes}
               isAdmin={true}
               onRefresh={fetchAllNotes}
             />
           ) : (
-            <NotesList 
-              notes={userNotes} 
+            <NotesList
+              notes={userNotes}
               isAdmin={false}
               onRefresh={fetchUserNotes}
             />
@@ -1693,7 +1693,7 @@ Your oral health is excellent! Keep up the great work with your daily dental car
       {error && (
         <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
           {error}
-          <button 
+          <button
             onClick={() => setError(null)}
             className="ml-3 text-white hover:text-red-200"
           >
@@ -1701,11 +1701,11 @@ Your oral health is excellent! Keep up the great work with your daily dental car
           </button>
         </div>
       )}
-      
+
       {success && (
         <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
           {success}
-          <button 
+          <button
             onClick={() => setSuccess(null)}
             className="ml-3 text-white hover:text-green-200"
           >
@@ -1845,14 +1845,23 @@ Your oral health is excellent! Keep up the great work with your daily dental car
             <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
               Admin Login
             </h2>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const email = (document.getElementById('admin-email') as HTMLInputElement).value;
-              const password = (document.getElementById('admin-password') as HTMLInputElement).value;
-              handleAdminLogin(email, password);
-            }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const email = (
+                  document.getElementById("admin-email") as HTMLInputElement
+                ).value;
+                const password = (
+                  document.getElementById("admin-password") as HTMLInputElement
+                ).value;
+                handleAdminLogin(email, password);
+              }}
+            >
               <div className="mb-4">
-                <label htmlFor="admin-email" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="admin-email"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Email
                 </label>
                 <input
@@ -1863,7 +1872,10 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 />
               </div>
               <div className="mb-6">
-                <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="admin-password"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Password
                 </label>
                 <input
@@ -1873,19 +1885,14 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                   required
                 />
               </div>
-              <button
-                type="submit"
-                className="btn-primary w-full"
-              >
+              <button type="submit" className="btn-primary w-full">
                 Login
               </button>
             </form>
             {success && (
               <p className="text-green-600 mt-4 text-center">{success}</p>
             )}
-            {error && (
-              <p className="text-red-600 mt-4 text-center">{error}</p>
-            )}
+            {error && <p className="text-red-600 mt-4 text-center">{error}</p>}
           </div>
         </div>
       )}
@@ -1894,7 +1901,11 @@ Your oral health is excellent! Keep up the great work with your daily dental car
 }
 
 // Notes List Component
-function NotesList({ notes, isAdmin, onRefresh }: {
+function NotesList({
+  notes,
+  isAdmin,
+  onRefresh,
+}: {
   notes: any[];
   isAdmin: boolean;
   onRefresh: () => void;
@@ -1902,7 +1913,9 @@ function NotesList({ notes, isAdmin, onRefresh }: {
   if (notes.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
-        {isAdmin ? 'No notes found in the system.' : 'No notes yet. Upload an audio file to get started!'}
+        {isAdmin
+          ? "No notes found in the system."
+          : "No notes yet. Upload an audio file to get started!"}
       </div>
     );
   }
@@ -1911,7 +1924,7 @@ function NotesList({ notes, isAdmin, onRefresh }: {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <span className="text-sm text-gray-600">
-          {notes.length} note{notes.length !== 1 ? 's' : ''} found
+          {notes.length} note{notes.length !== 1 ? "s" : ""} found
         </span>
         <button
           onClick={onRefresh}
@@ -1920,9 +1933,12 @@ function NotesList({ notes, isAdmin, onRefresh }: {
           Refresh
         </button>
       </div>
-      
+
       {notes.map((note, index) => (
-        <div key={note.id || index} className="border border-gray-200 rounded-lg p-4">
+        <div
+          key={note.id || index}
+          className="border border-gray-200 rounded-lg p-4"
+        >
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-semibold text-gray-800">
               {note.filename || `Note ${index + 1}`}
@@ -1931,21 +1947,23 @@ function NotesList({ notes, isAdmin, onRefresh }: {
               {new Date(note.created_at || Date.now()).toLocaleDateString()}
             </span>
           </div>
-          
-          {note.content && (
-            <p className="text-gray-700 mb-3">{note.content}</p>
-          )}
-          
+
+          {note.content && <p className="text-gray-700 mb-3">{note.content}</p>}
+
           {note.status && (
-            <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-              note.status === 'completed' ? 'bg-green-100 text-green-800' :
-              note.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-800'
-            }`}>
+            <span
+              className={`inline-block px-2 py-1 text-xs rounded-full ${
+                note.status === "completed"
+                  ? "bg-green-100 text-green-800"
+                  : note.status === "processing"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
               {note.status}
             </span>
           )}
-          
+
           {isAdmin && note.user_email && (
             <p className="text-xs text-gray-500 mt-2">
               User: {note.user_email}
