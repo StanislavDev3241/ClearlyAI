@@ -24,9 +24,8 @@ interface OutputSelection {
 }
 
 function App() {
-  // API Configuration
-  const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || "https://83.229.115.190:3001";
+  // API Configuration - Use relative URLs for Docker deployment
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
   const API_ENDPOINTS = {
     login: `${API_BASE_URL}/api/auth/login`,
     upload: `${API_BASE_URL}/api/upload`,
