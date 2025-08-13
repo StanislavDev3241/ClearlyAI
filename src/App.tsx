@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Copy,
   Download,
-  Menu,
   Mic,
   Square,
   Play,
@@ -25,6 +24,15 @@ interface OutputSelection {
 }
 
 function App() {
+  // API Configuration
+  const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL || "http://83.229.115.190:3001";
+  const API_ENDPOINTS = {
+    login: `${API_BASE_URL}/api/auth/login`,
+    upload: `${API_BASE_URL}/api/upload`,
+    health: `${API_BASE_URL}/health`,
+  };
+
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [output, setOutput] = useState<OutputData | null>(null);
@@ -39,6 +47,15 @@ function App() {
   const [hipaaChoice, setHipaaChoice] = useState<"save" | "delete" | null>(
     null
   );
+
+  // Add authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [user, setUser] = useState<{
+    id: number;
+    email: string;
+    role: string;
+  } | null>(null);
 
   // Add upload progress tracking
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -95,6 +112,35 @@ function App() {
   useEffect(() => {
     return cleanup;
   }, [cleanup]);
+
+  // Simple login function
+  const handleLogin = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.login, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: "admin@clearlyai.com",
+          password: "admin_secure_password_2024",
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAuthToken(data.token);
+        setUser(data.user);
+        setIsAuthenticated(true);
+        console.log("✅ Login successful:", data.user.email);
+      } else {
+        throw new Error("Login failed");
+      }
+    } catch (error) {
+      console.error("❌ Login error:", error);
+      setError(error instanceof Error ? error.message : "Login failed");
+    }
+  };
 
   // Log state changes for debugging
   useEffect(() => {
@@ -524,11 +570,14 @@ function App() {
     setRemainingTime(null);
 
     try {
-      // Use CORS proxy to bypass CORS restrictions
-      const webhookUrl =
-        import.meta.env.VITE_MAKE_WEBHOOK_URL ||
-        "https://hook.us2.make.com/xw5ld4jn0by5jn7hg1bups02srki06f8";
-      const apiKey = import.meta.env.VITE_MAKE_API_KEY || "clearlyai@2025";
+      // Check if user is authenticated
+      if (!isAuthenticated || !authToken) {
+        throw new Error("Please log in to upload files");
+      }
+
+      // Use custom server instead of Make.com directly
+      const webhookUrl = API_ENDPOINTS.upload;
+      const apiKey = authToken; // Use auth token instead of API key
 
       // Dynamic timeout: 1MB = 1 minute + 5% buffer for safety
       const fileSizeMB = file.size / (1024 * 1024);
@@ -598,11 +647,19 @@ function App() {
         );
 
         xhr.open("POST", webhookUrl);
-        xhr.setRequestHeader("x-make-apikey", apiKey);
+        xhr.setRequestHeader("Authorization", `Bearer ${apiKey}`);
         xhr.timeout = timeoutDuration;
 
         const formData = new FormData();
         formData.append("file", file);
+        formData.append(
+          "noteType",
+          outputSelection.soapNote && outputSelection.patientSummary
+            ? "both"
+            : outputSelection.soapNote
+            ? "soap"
+            : "summary"
+        );
         xhr.send(formData);
       });
 
@@ -868,9 +925,35 @@ Your oral health is excellent! Keep up the great work with your daily dental car
                 EZNotes.pro
               </h1>
             </div>
-            <button className="p-2 rounded-md text-gray-600 hover:text-gray-900">
-              <Menu className="h-6 w-6" />
-            </button>
+            {!isAuthenticated ? (
+              <button
+                onClick={handleLogin}
+                className="bg-clearly-blue hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+              >
+                Login to Server
+              </button>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user?.email}
+                  </p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {user?.role}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setAuthToken(null);
+                    setUser(null);
+                    setIsAuthenticated(false);
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
